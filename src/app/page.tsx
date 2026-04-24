@@ -54,7 +54,6 @@ export default async function KanbanPage() {
             </Link>
           </div>
         ) : (
-          // @ts-expect-error — Server Component passing to Client Component
           <KanbanBoard initialColumns={JSON.parse(JSON.stringify(columns))} onRefresh={() => {}} />
         )}
       </div>
