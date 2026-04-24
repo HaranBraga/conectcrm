@@ -8,7 +8,7 @@ export async function GET() {
       conversations: {
         where: { contact: { source: "message" } },
         include: {
-          contact: { select: { id: true, name: true, phone: true, role: true, lastContactAt: true, lastMessage: true } },
+          contact: { select: { id: true, name: true, phone: true, role: true, lastContactAt: true, lastMessage: true, profilePhotoUrl: true, labels: true } },
         },
         orderBy: { updatedAt: "desc" },
       },

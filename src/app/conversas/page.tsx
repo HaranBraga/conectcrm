@@ -2,14 +2,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search, Send, Tag, X, Plus, UserPlus, RefreshCw,
-  CheckCheck, Paperclip, Image as ImageIcon, Video, FileText, Link2
+  CheckCheck, Paperclip, Link2, FileText, Mic,
 } from "lucide-react";
 import { RoleBadge, ROLE_LABELS, ROLE_ORDER } from "@/components/ui/RoleBadge";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Labels ──────────────────────────────────────────────────────────────────
 
 const LABEL_COLORS = [
   { name: "Interessado",  color: "#10b981" },
@@ -27,51 +27,41 @@ function msgTime(d: string) {
   return format(date, "dd/MM", { locale: ptBR });
 }
 
-// ── Avatar ─────────────────────────────────────────────────────────────────
+// ── Avatar estável ──────────────────────────────────────────────────────────
 
 function Avatar({ contact, size = 40 }: { contact: any; size?: number }) {
   const [err, setErr] = useState(false);
+  const photo = contact?.profilePhotoUrl;
   const initial = (contact?.name?.[0] ?? "?").toUpperCase();
-  const style = { width: size, height: size, minWidth: size };
+  const s = { width: size, height: size, minWidth: size, minHeight: size };
 
-  if (contact?.profilePhotoUrl && !err) {
-    return (
-      <img
-        src={contact.profilePhotoUrl}
-        alt={contact.name}
-        style={style}
-        className="rounded-full object-cover shrink-0"
-        onError={() => setErr(true)}
-      />
-    );
+  if (photo && !err) {
+    return <img src={photo} alt="" style={s} className="rounded-full object-cover shrink-0" onError={() => setErr(true)} />;
   }
   return (
-    <div
-      style={style}
-      className="rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-semibold shrink-0 text-sm"
-    >
+    <div style={s} className="rounded-full bg-indigo-100 flex items-center justify-center font-semibold text-indigo-700 shrink-0 text-sm select-none">
       {initial}
     </div>
   );
 }
 
-// ── Etiquetas ──────────────────────────────────────────────────────────────
+// ── Etiquetas ───────────────────────────────────────────────────────────────
 
 function LabelManager({ contact, onUpdate }: any) {
   const [open, setOpen] = useState(false);
   const [custom, setCustom] = useState("");
-  const labels: string[] = contact?.labels ?? [];
   const ref = useRef<HTMLDivElement>(null);
+  const labels: string[] = contact?.labels ?? [];
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
   }, [open]);
 
   async function toggle(label: string) {
-    const next = labels.includes(label) ? labels.filter((l) => l !== label) : [...labels, label];
+    const next = labels.includes(label) ? labels.filter(l => l !== label) : [...labels, label];
     const r = await fetch(`/api/contacts/${contact.id}/labels`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ labels: next }) });
     if (r.ok) onUpdate(next);
   }
@@ -85,30 +75,30 @@ function LabelManager({ contact, onUpdate }: any) {
 
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-brand-600 px-2 py-1.5 rounded-lg hover:bg-brand-50 transition-colors">
-        <Tag size={13} />
-        {labels.length > 0 ? `${labels.length} etiqueta${labels.length > 1 ? "s" : ""}` : "Etiquetas"}
+      <button onClick={() => setOpen(v => !v)} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-indigo-600 px-2 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors">
+        <Tag size={13} />{labels.length > 0 ? `${labels.length} etiqueta${labels.length > 1 ? "s" : ""}` : "Etiquetas"}
       </button>
       {open && (
-        <div className="absolute right-0 top-9 z-20 bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-60">
-          <p className="text-xs font-semibold text-gray-500 mb-2">ETIQUETAS</p>
+        <div className="absolute right-0 top-9 z-20 bg-white border border-gray-100 rounded-2xl shadow-xl p-4 w-64">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Etiquetas</p>
           <div className="flex flex-wrap gap-1.5 mb-3">
             {LABEL_COLORS.map(({ name, color }) => (
               <button key={name} onClick={() => toggle(name)}
-                className={`text-xs px-2.5 py-1 rounded-full border transition-all ${labels.includes(name) ? "text-white border-transparent" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
-                style={labels.includes(name) ? { backgroundColor: color } : {}}
-              >{name}</button>
+                className="text-xs px-2.5 py-1 rounded-full border transition-all"
+                style={labels.includes(name) ? { backgroundColor: color, color: "#fff", borderColor: "transparent" } : { borderColor: "#e5e7eb", color: "#374151" }}>
+                {name}
+              </button>
             ))}
           </div>
-          {labels.filter((l) => !LABEL_COLORS.find((lc) => lc.name === l)).map((l) => (
-            <div key={l} className="flex items-center gap-1 bg-gray-100 rounded-full px-2.5 py-1 mb-1 text-xs">
-              <span className="flex-1 truncate">{l}</span>
-              <button onClick={() => toggle(l)} className="text-gray-400 hover:text-red-500"><X size={10} /></button>
+          {labels.filter(l => !LABEL_COLORS.find(lc => lc.name === l)).map(l => (
+            <div key={l} className="flex items-center gap-1 bg-gray-100 rounded-full px-3 py-1 mb-1">
+              <span className="flex-1 text-xs truncate">{l}</span>
+              <button onClick={() => toggle(l)}><X size={10} className="text-gray-400 hover:text-red-500" /></button>
             </div>
           ))}
-          <div className="flex gap-1.5 mt-2">
-            <input value={custom} onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustom()} placeholder="Personalizada..." className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-            <button onClick={addCustom} className="px-2 py-1 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-xs font-medium">+</button>
+          <div className="flex gap-1.5 mt-3">
+            <input value={custom} onChange={e => setCustom(e.target.value)} onKeyDown={e => e.key === "Enter" && addCustom()} placeholder="Nova etiqueta..." className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+            <button onClick={addCustom} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-xs hover:bg-indigo-700">+</button>
           </div>
         </div>
       )}
@@ -116,18 +106,18 @@ function LabelManager({ contact, onUpdate }: any) {
   );
 }
 
-// ── Novo Contato ───────────────────────────────────────────────────────────
+// ── Novo Contato ─────────────────────────────────────────────────────────────
 
 function NewContactModal({ phone, name, onSave, onClose }: any) {
   const [form, setForm] = useState({ name: name || "", phone: phone || "", role: "APOIADOR" });
   const [saving, setSaving] = useState(false);
-  const f = (k: string) => (e: any) => setForm((p) => ({ ...p, [k]: e.target.value }));
+  const f = (k: string) => (e: any) => setForm(p => ({ ...p, [k]: e.target.value }));
 
   async function save(e: React.FormEvent) {
     e.preventDefault(); setSaving(true);
     try {
       const r = await fetch("/api/contacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, source: "message" }) });
-      if (!r.ok) { const d = await r.json(); toast.error(d.error); return; }
+      if (!r.ok) { toast.error((await r.json()).error); return; }
       toast.success("Contato salvo!"); onSave();
     } finally { setSaving(false); }
   }
@@ -136,16 +126,16 @@ function NewContactModal({ phone, name, onSave, onClose }: any) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Salvar Contato</h3>
+        <h3 className="font-semibold text-gray-900 mb-4">Salvar contato</h3>
         <form onSubmit={save} className="flex flex-col gap-3">
-          <input required value={form.name} onChange={f("name")} placeholder="Nome *" className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-          <input required value={form.phone} onChange={f("phone")} placeholder="Telefone *" className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-          <select value={form.role} onChange={f("role")} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-            {ROLE_ORDER.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+          <input required value={form.name} onChange={f("name")} placeholder="Nome *" className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <input required value={form.phone} onChange={f("phone")} placeholder="Telefone *" className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <select value={form.role} onChange={f("role")} className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            {ROLE_ORDER.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
           </select>
           <div className="flex gap-2 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 border border-gray-200 rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
-            <button disabled={saving} className="flex-1 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium">{saving ? "Salvando..." : "Salvar"}</button>
+            <button type="button" onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+            <button disabled={saving} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-medium">{saving ? "Salvando..." : "Salvar"}</button>
           </div>
         </form>
       </div>
@@ -153,21 +143,22 @@ function NewContactModal({ phone, name, onSave, onClose }: any) {
   );
 }
 
-// ── Media Modal ────────────────────────────────────────────────────────────
+// ── Media / Link Modal ────────────────────────────────────────────────────────
 
-type MediaTab = "file" | "link";
-
-interface MediaPayload {
+interface SendPayload {
   base64?: string; mimeType?: string; fileName?: string;
-  linkUrl?: string; caption?: string;
+  linkUrl?: string; linkTitle?: string; linkDescription?: string;
+  caption?: string;
 }
 
-function MediaModal({ onSend, onClose }: { onSend: (p: MediaPayload) => void; onClose: () => void }) {
-  const [tab, setTab] = useState<MediaTab>("file");
-  const [caption, setCaption] = useState("");
-  const [link, setLink] = useState("");
+function AttachModal({ onSend, onClose }: { onSend: (p: SendPayload) => void; onClose: () => void }) {
+  const [tab, setTab] = useState<"file" | "link">("file");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [caption, setCaption] = useState("");
+  const [link, setLink] = useState("");
+  const [linkTitle, setLinkTitle] = useState("");
+  const [linkDesc, setLinkDesc] = useState("");
   const [loading, setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -175,31 +166,24 @@ function MediaModal({ onSend, onClose }: { onSend: (p: MediaPayload) => void; on
     const f = e.target.files?.[0];
     if (!f) return;
     setFile(f);
-    if (f.type.startsWith("image/")) {
-      setPreview(URL.createObjectURL(f));
-    } else {
-      setPreview(null);
-    }
+    setPreview(f.type.startsWith("image/") ? URL.createObjectURL(f) : null);
   }
 
   async function send() {
+    if (loading) return;
     setLoading(true);
     try {
       if (tab === "link") {
         if (!link.trim()) return;
-        onSend({ linkUrl: link.trim(), caption: caption || undefined });
+        onSend({ linkUrl: link.trim(), linkTitle: linkTitle.trim() || undefined, linkDescription: linkDesc.trim() || undefined });
       } else {
         if (!file) return;
-        const base64 = await new Promise<string>((resolve) => {
+        const base64 = await new Promise<string>(res => {
           const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result as string;
-            // Remove o prefixo "data:mimetype;base64,"
-            resolve(result.split(",")[1]);
-          };
+          reader.onload = () => res((reader.result as string).split(",")[1]);
           reader.readAsDataURL(file);
         });
-        onSend({ base64, mimeType: file.type, fileName: file.name, caption: caption || undefined });
+        onSend({ base64, mimeType: file.type, fileName: file.name, caption: caption.trim() || undefined });
       }
       onClose();
     } finally { setLoading(false); }
@@ -208,58 +192,53 @@ function MediaModal({ onSend, onClose }: { onSend: (p: MediaPayload) => void; on
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-5">
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900">Enviar mídia</h3>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400"><X size={16} /></button>
+          <span className="font-semibold text-gray-900 text-sm">Anexar</span>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400"><X size={15} /></button>
         </div>
 
-        <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">
-          <button onClick={() => setTab("file")} className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg font-medium transition-all ${tab === "file" ? "bg-white shadow text-brand-700" : "text-gray-500"}`}>
-            <Paperclip size={13} /> Arquivo
-          </button>
-          <button onClick={() => setTab("link")} className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg font-medium transition-all ${tab === "link" ? "bg-white shadow text-brand-700" : "text-gray-500"}`}>
-            <Link2 size={13} /> Link
-          </button>
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4">
+          {([["file", "Arquivo", Paperclip], ["link", "Link / Preview", Link2]] as const).map(([t, label, Icon]) => (
+            <button key={t} onClick={() => setTab(t)} className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-2 rounded-lg font-medium transition-all ${tab === t ? "bg-white shadow text-indigo-700" : "text-gray-500"}`}>
+              <Icon size={13} />{label}
+            </button>
+          ))}
         </div>
 
         {tab === "file" ? (
           <div className="flex flex-col gap-3">
-            <div
-              onClick={() => fileRef.current?.click()}
-              className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors"
-            >
+            <div onClick={() => fileRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl p-5 flex flex-col items-center gap-2 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
               {file ? (
-                <div className="flex flex-col items-center gap-2">
-                  {preview
-                    ? <img src={preview} className="max-h-32 rounded-lg object-contain" alt="preview" />
-                    : <FileText size={32} className="text-gray-400" />
-                  }
-                  <p className="text-sm font-medium text-gray-700 truncate max-w-full">{file.name}</p>
-                  <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(1)} KB · {file.type}</p>
-                </div>
+                <>
+                  {preview ? <img src={preview} className="max-h-28 rounded-lg object-contain" alt="" /> : <FileText size={32} className="text-gray-300" />}
+                  <p className="text-xs font-medium text-gray-700 truncate max-w-full text-center">{file.name}</p>
+                  <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(0)} KB</p>
+                </>
               ) : (
-                <div className="flex flex-col items-center gap-2 text-gray-400">
-                  <Paperclip size={28} />
-                  <p className="text-sm font-medium">Clique para selecionar</p>
-                  <p className="text-xs">Imagem, vídeo, PDF, áudio...</p>
-                </div>
+                <>
+                  <Paperclip size={24} className="text-gray-300" />
+                  <p className="text-sm text-gray-400">Selecionar arquivo</p>
+                  <p className="text-xs text-gray-300">Imagem, vídeo, PDF, áudio…</p>
+                </>
               )}
             </div>
-            <input ref={fileRef} type="file" className="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip" onChange={onFileChange} />
-            <input value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Legenda (opcional)" className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <input ref={fileRef} type="file" className="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.rar" onChange={onFileChange} />
+            <input value={caption} onChange={e => setCaption(e.target.value)} placeholder="Legenda (opcional)" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://..." className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            <input value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Descrição (opcional)" className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          <div className="flex flex-col gap-2.5">
+            <input value={link} onChange={e => setLink(e.target.value)} placeholder="URL *" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input value={linkTitle} onChange={e => setLinkTitle(e.target.value)} placeholder="Título (opcional)" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input value={linkDesc} onChange={e => setLinkDesc(e.target.value)} placeholder="Descrição (opcional)" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <p className="text-xs text-gray-400">O WhatsApp irá gerar o preview automaticamente</p>
           </div>
         )}
 
         <div className="flex gap-2 mt-4">
-          <button onClick={onClose} className="flex-1 border border-gray-200 rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
-          <button onClick={send} disabled={loading || (tab === "file" ? !file : !link.trim())} className="flex-1 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-2">
-            {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={14} />}
+          <button onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2 text-sm text-gray-600">Cancelar</button>
+          <button onClick={send} disabled={loading || (tab === "file" ? !file : !link.trim())} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl py-2 text-sm font-medium flex items-center justify-center gap-1.5">
+            {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={13} />}
             {loading ? "Enviando..." : "Enviar"}
           </button>
         </div>
@@ -268,74 +247,68 @@ function MediaModal({ onSend, onClose }: { onSend: (p: MediaPayload) => void; on
   );
 }
 
-// ── Exibição de mídia recebida ─────────────────────────────────────────────
+// ── Bolha de mídia recebida ──────────────────────────────────────────────────
 
-function MediaMessage({ messageId, mediaType }: { messageId: string; mediaType: string }) {
+function MediaBubble({ messageId, mediaType }: { messageId: string; mediaType: string }) {
   const [src, setSrc] = useState<string | null>(null);
-  const [error, setError] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
   async function load() {
-    setLoading(true);
+    setState("loading");
     try {
       const r = await fetch(`/api/messages/${messageId}/media`);
       if (!r.ok) throw new Error();
-      const blob = await r.blob();
-      setSrc(URL.createObjectURL(blob));
-    } catch { setError(true); }
-    finally { setLoading(false); }
+      setSrc(URL.createObjectURL(await r.blob()));
+      setState("ready");
+    } catch { setState("error"); }
   }
 
-  if (error) return <p className="text-xs text-red-400">Mídia indisponível</p>;
+  if (state === "error") return <p className="text-xs text-red-400 py-1">Mídia indisponível</p>;
 
   if (mediaType === "image") {
-    if (!src) return (
-      <button onClick={load} disabled={loading} className="flex items-center gap-2 text-xs text-brand-600 hover:underline">
-        {loading ? <div className="w-3 h-3 border border-brand-600 border-t-transparent rounded-full animate-spin" /> : <ImageIcon size={14} />}
-        {loading ? "Carregando..." : "Ver imagem"}
+    if (state !== "ready") return (
+      <button onClick={load} disabled={state === "loading"} className="flex items-center gap-2 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-xl transition-colors w-full justify-center">
+        {state === "loading" ? <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" /> : <span className="text-base">🖼</span>}
+        <span>{state === "loading" ? "Carregando…" : "Ver imagem"}</span>
       </button>
     );
-    return <img src={src} className="rounded-xl max-w-full max-h-48 object-contain cursor-pointer" onClick={() => window.open(src, "_blank")} alt="imagem" />;
+    return <img src={src!} className="rounded-xl max-w-full max-h-52 object-contain cursor-pointer" onClick={() => window.open(src!, "_blank")} alt="" />;
   }
 
   if (mediaType === "video") {
-    if (!src) return (
-      <button onClick={load} disabled={loading} className="flex items-center gap-2 text-xs text-brand-600 hover:underline">
-        {loading ? <div className="w-3 h-3 border border-brand-600 border-t-transparent rounded-full animate-spin" /> : <Video size={14} />}
-        {loading ? "Carregando..." : "Ver vídeo"}
+    if (state !== "ready") return (
+      <button onClick={load} disabled={state === "loading"} className="flex items-center gap-2 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-xl transition-colors w-full justify-center">
+        {state === "loading" ? <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" /> : <span className="text-base">🎬</span>}
+        <span>{state === "loading" ? "Carregando…" : "Ver vídeo"}</span>
       </button>
     );
-    return <video src={src} controls className="rounded-xl max-w-full max-h-48" />;
+    return <video src={src!} controls className="rounded-xl max-w-full max-h-52" />;
   }
 
   if (mediaType === "audio") {
-    if (!src) return (
-      <button onClick={load} disabled={loading} className="flex items-center gap-2 text-xs text-brand-600 hover:underline">
-        {loading ? <div className="w-3 h-3 border border-brand-600 border-t-transparent rounded-full animate-spin" /> : <span>🎵</span>}
-        {loading ? "Carregando..." : "Ouvir áudio"}
+    if (state !== "ready") return (
+      <button onClick={load} disabled={state === "loading"} className="flex items-center gap-2 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-xl transition-colors w-full">
+        {state === "loading" ? <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" /> : <Mic size={14} className="shrink-0" />}
+        <span>{state === "loading" ? "Carregando…" : "Ouvir áudio"}</span>
       </button>
     );
-    return <audio src={src} controls className="w-full max-w-xs" />;
+    return <audio src={src!} controls className="w-full max-w-xs" />;
   }
 
   if (mediaType === "document") {
-    if (!src) return (
-      <button onClick={load} disabled={loading} className="flex items-center gap-2 text-xs text-brand-600 hover:underline">
-        {loading ? <div className="w-3 h-3 border border-brand-600 border-t-transparent rounded-full animate-spin" /> : <FileText size={14} />}
-        {loading ? "Carregando..." : "Baixar arquivo"}
+    if (state !== "ready") return (
+      <button onClick={load} disabled={state === "loading"} className="flex items-center gap-2 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-xl transition-colors w-full">
+        {state === "loading" ? <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" /> : <FileText size={14} className="shrink-0 text-gray-400" />}
+        <span>{state === "loading" ? "Carregando…" : "Baixar arquivo"}</span>
       </button>
     );
-    return (
-      <a href={src} download className="flex items-center gap-2 text-xs text-brand-600 hover:underline">
-        <FileText size={14} /> Baixar arquivo
-      </a>
-    );
+    return <a href={src!} download className="flex items-center gap-2 text-xs text-indigo-600 hover:underline"><FileText size={14} /> Baixar arquivo</a>;
   }
 
   return null;
 }
 
-// ── Página principal ───────────────────────────────────────────────────────
+// ── Página ───────────────────────────────────────────────────────────────────
 
 export default function ConversasPage() {
   const [conversations, setConversations] = useState<any[]>([]);
@@ -346,146 +319,137 @@ export default function ConversasPage() {
   const [sending, setSending] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [newContact, setNewContact] = useState<any | null>(null);
-  const [mediaModal, setMediaModal] = useState(false);
+  const [attachModal, setAttachModal] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const loadConversations = useCallback(async () => {
-    const r = await fetch("/api/kanban");
-    const cols = await r.json();
-    const all = cols.flatMap((c: any) =>
-      c.conversations.map((conv: any) => ({ ...conv, statusName: c.name, statusColor: c.color }))
-    );
-    all.sort((a: any, b: any) =>
-      new Date(b.lastMessageAt || b.updatedAt).getTime() - new Date(a.lastMessageAt || a.updatedAt).getTime()
-    );
-    setConversations(all);
+    try {
+      const r = await fetch("/api/kanban");
+      const cols = await r.json();
+      const all = cols.flatMap((c: any) => c.conversations.map((conv: any) => ({ ...conv, statusName: c.name, statusColor: c.color })));
+      all.sort((a: any, b: any) => new Date(b.lastMessageAt || b.updatedAt).getTime() - new Date(a.lastMessageAt || a.updatedAt).getTime());
+      setConversations(all);
+    } catch {}
   }, []);
 
   const loadMessages = useCallback(async (convId: string) => {
-    const r = await fetch(`/api/conversations/${convId}`);
-    const d = await r.json();
-    setMessages(d.messages ?? []);
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
+    try {
+      const r = await fetch(`/api/conversations/${convId}`);
+      const d = await r.json();
+      const msgs: any[] = d.messages ?? [];
+      // Deduplicação por ID
+      const unique = Array.from(new Map(msgs.map((m: any) => [m.id, m])).values());
+      setMessages(unique);
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
+    } catch {}
   }, []);
 
-  // Carrega foto de perfil se não tiver
   const loadPhoto = useCallback(async (contact: any) => {
-    if (contact?.profilePhotoUrl || !contact?.id) return;
+    if (!contact?.id || contact?.profilePhotoUrl) return;
     try {
       const r = await fetch(`/api/contacts/${contact.id}/photo`, { method: "POST" });
       const d = await r.json();
       if (d.url) {
-        setConversations((prev) =>
-          prev.map((c) => c.contactId === contact.id ? { ...c, contact: { ...c.contact, profilePhotoUrl: d.url } } : c)
-        );
-        setSelected((s: any) => s ? { ...s, contact: { ...s.contact, profilePhotoUrl: d.url } } : s);
+        setConversations(prev => prev.map(c => c.contactId === contact.id ? { ...c, contact: { ...c.contact, profilePhotoUrl: d.url } } : c));
+        setSelected((s: any) => s?.contactId === contact.id ? { ...s, contact: { ...s.contact, profilePhotoUrl: d.url } } : s);
       }
     } catch {}
   }, []);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
+  const selectedId = selected?.id;
   useEffect(() => {
-    if (!selected) return;
-    loadMessages(selected.id);
-    loadPhoto(selected.contact);
-    const interval = setInterval(() => loadMessages(selected.id), 5000);
+    if (!selectedId) return;
+    loadMessages(selectedId);
+    const interval = setInterval(() => loadMessages(selectedId), 6000);
     return () => clearInterval(interval);
-  }, [selected?.id]);
+  }, [selectedId, loadMessages]);
 
-  async function refresh() {
-    setRefreshing(true);
-    await loadConversations();
-    if (selected) await loadMessages(selected.id);
-    setRefreshing(false);
-  }
+  useEffect(() => {
+    if (selected?.contact) loadPhoto(selected.contact);
+  }, [selected?.contactId]);
 
-  async function sendMessage(payload: { message?: string; mediaUrl?: string; mediaType?: string; linkUrl?: string; base64?: string; mimeType?: string; fileName?: string; caption?: string }) {
-    if (!selected) return;
+  async function sendMsg(payload: any) {
+    if (!selected || sending) return;
     setSending(true);
     try {
-      const r = await fetch(`/api/conversations/${selected.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const r = await fetch(`/api/conversations/${selected.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!r.ok) { toast.error("Erro ao enviar"); return; }
       const msg = await r.json();
-      setMessages((p) => [...p, msg]);
+      setMessages(prev => {
+        const exists = prev.some(m => m.id === msg.id);
+        return exists ? prev : [...prev, msg];
+      });
       setText("");
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
       loadConversations();
-    } catch { toast.error("Erro ao enviar"); }
-    finally { setSending(false); }
+    } finally { setSending(false); }
   }
 
-  async function handleMediaSend(p: MediaPayload) {
+  async function handleAttach(p: SendPayload) {
     if (p.linkUrl) {
-      await sendMessage({ linkUrl: p.linkUrl, message: p.caption });
+      await sendMsg({ linkUrl: p.linkUrl, linkTitle: p.linkTitle, linkDescription: p.linkDescription });
     } else if (p.base64) {
-      await sendMessage({ base64: p.base64, mimeType: p.mimeType, fileName: p.fileName, message: p.caption });
+      await sendMsg({ base64: p.base64, mimeType: p.mimeType, fileName: p.fileName, message: p.caption });
     }
   }
 
   function updateLabels(contactId: string, labels: string[]) {
-    setConversations((prev) => prev.map((c) => c.contactId === contactId ? { ...c, contact: { ...c.contact, labels } } : c));
-    if (selected?.contactId === contactId) setSelected((s: any) => ({ ...s, contact: { ...s.contact, labels } }));
+    setConversations(prev => prev.map(c => c.contactId === contactId ? { ...c, contact: { ...c.contact, labels } } : c));
+    setSelected((s: any) => s?.contactId === contactId ? { ...s, contact: { ...s.contact, labels } } : s);
   }
 
-  const filtered = conversations.filter((c) => {
+  const filtered = conversations.filter(c => {
     const q = search.toLowerCase();
     return !q || c.contact?.name?.toLowerCase().includes(q) || c.contact?.phone?.includes(q);
   });
 
-  const isUnknown = selected && (selected.contact?.name === selected.contact?.phone || !selected.contact?.name);
+  const isUnknown = selected && (!selected.contact?.name || selected.contact?.name === selected.contact?.phone);
 
   return (
-    <div className="flex h-screen">
-      {/* ── Lista de conversas ───────────────────────────────── */}
-      <aside className="w-80 flex flex-col border-r border-gray-200 bg-white shrink-0">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <h2 className="font-bold text-gray-900 text-base">Conversas</h2>
-          <button onClick={refresh} title="Atualizar" className={`p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 ${refreshing ? "animate-spin" : ""}`}>
-            <RefreshCw size={15} />
+    <div className="flex h-screen bg-gray-50">
+      {/* ── Sidebar ── */}
+      <aside className="w-72 flex flex-col border-r border-gray-200 bg-white shrink-0">
+        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-100">
+          <span className="font-semibold text-gray-900">Conversas</span>
+          <button onClick={async () => { setRefreshing(true); await loadConversations(); setRefreshing(false); }} className={`p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 ${refreshing ? "animate-spin" : ""}`}>
+            <RefreshCw size={14} />
           </button>
         </div>
-
         <div className="px-3 py-2 border-b border-gray-100">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="w-full pl-8 pr-3 py-2 bg-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar…" className="w-full pl-8 pr-3 py-2 bg-gray-100 rounded-xl text-sm focus:outline-none" />
           </div>
         </div>
-
         <div className="flex-1 overflow-y-auto">
           {filtered.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400 text-sm gap-2 p-6 text-center">
-              <p className="font-medium">Nenhuma conversa</p>
-              <p className="text-xs">Configure o webhook na Evolution API para receber mensagens automaticamente</p>
-              <code className="text-xs bg-gray-100 rounded-lg px-2 py-1 text-brand-600 break-all mt-1">/api/webhook</code>
+            <div className="p-6 text-center text-gray-400 text-xs space-y-2">
+              <p className="font-medium text-sm">Nenhuma conversa</p>
+              <p>Configure o webhook na Evolution API:</p>
+              <code className="block bg-gray-100 rounded-lg px-2 py-1 text-indigo-600 break-all">/api/webhook</code>
             </div>
           )}
-          {filtered.map((conv) => {
-            const labels: string[] = conv.contact?.labels ?? [];
+          {filtered.map(conv => {
             const active = selected?.id === conv.id;
+            const labels: string[] = conv.contact?.labels ?? [];
             return (
-              <div key={conv.id} onClick={() => setSelected(conv)}
-                className={`flex items-center gap-3 px-3 py-3 cursor-pointer border-b border-gray-50 hover:bg-gray-50 transition-colors ${active ? "bg-brand-50 border-l-2 border-l-brand-600" : ""}`}
-              >
+              <div key={conv.id} onClick={() => setSelected(conv)} className={`flex items-center gap-3 px-3 py-3 cursor-pointer border-b border-gray-50 hover:bg-gray-50 ${active ? "bg-indigo-50 border-l-[3px] border-l-indigo-500" : ""}`}>
                 <Avatar contact={conv.contact} size={42} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
-                    <p className="font-medium text-sm text-gray-900 truncate">{conv.contact?.name || conv.contact?.phone}</p>
-                    <span className="text-xs text-gray-400 shrink-0">{conv.lastMessageAt ? msgTime(conv.lastMessageAt) : ""}</span>
+                    <p className="text-sm font-medium text-gray-900 truncate">{conv.contact?.name || conv.contact?.phone}</p>
+                    <span className="text-[11px] text-gray-400 shrink-0">{conv.lastMessageAt ? msgTime(conv.lastMessageAt) : ""}</span>
                   </div>
-                  <p className="text-xs text-gray-500 truncate mt-0.5">{conv.lastMessageText || "Sem mensagens"}</p>
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{conv.lastMessageText || "—"}</p>
                   {labels.length > 0 && (
-                    <div className="flex gap-1 mt-1 flex-wrap">
-                      {labels.slice(0, 2).map((l) => {
-                        const cfg = LABEL_COLORS.find((lc) => lc.name === l);
-                        return <span key={l} className="text-xs px-1.5 py-0.5 rounded-full text-white leading-none" style={{ backgroundColor: cfg?.color ?? "#6b7280" }}>{l}</span>;
+                    <div className="flex gap-1 mt-1">
+                      {labels.slice(0, 2).map(l => {
+                        const cfg = LABEL_COLORS.find(lc => lc.name === l);
+                        return <span key={l} className="text-[10px] px-1.5 py-0.5 rounded-full text-white leading-none" style={{ backgroundColor: cfg?.color ?? "#6b7280" }}>{l}</span>;
                       })}
-                      {labels.length > 2 && <span className="text-xs text-gray-400">+{labels.length - 2}</span>}
+                      {labels.length > 2 && <span className="text-[10px] text-gray-400">+{labels.length - 2}</span>}
                     </div>
                   )}
                 </div>
@@ -495,32 +459,29 @@ export default function ConversasPage() {
         </div>
       </aside>
 
-      {/* ── Área do chat ─────────────────────────────────────── */}
+      {/* ── Chat ── */}
       {!selected ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-gray-400 bg-gray-50 gap-3">
-          <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
-            <Send size={28} className="text-gray-400" />
-          </div>
-          <p className="font-medium text-gray-600 text-lg">Selecione uma conversa</p>
-          <p className="text-sm">As mensagens recebidas do WhatsApp aparecem aqui</p>
+        <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+          <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Send size={22} className="text-gray-300" /></div>
+          <p className="font-medium text-gray-600">Selecione uma conversa</p>
+          <p className="text-sm mt-1">Mensagens do WhatsApp aparecem aqui automaticamente</p>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col bg-[#f0f2f5]">
+        <div className="flex-1 flex flex-col">
           {/* Header */}
-          <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 shadow-sm">
-            <Avatar contact={selected.contact} size={40} />
+          <div className="flex items-center gap-3 px-5 py-3 bg-white border-b border-gray-100">
+            <Avatar contact={selected.contact} size={38} />
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-semibold text-gray-900 truncate">{selected.contact?.name || selected.contact?.phone}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-gray-900 text-sm truncate">{selected.contact?.name || selected.contact?.phone}</p>
                 {selected.contact?.role && <RoleBadge role={selected.contact.role} />}
               </div>
-              <p className="text-xs text-gray-500">{selected.contact?.phone}</p>
+              <p className="text-xs text-gray-400">{selected.contact?.phone}</p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
               {isUnknown && (
-                <button onClick={() => setNewContact(selected.contact)}
-                  className="flex items-center gap-1.5 text-xs bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 px-3 py-1.5 rounded-lg transition-colors font-medium">
-                  <UserPlus size={13} /> Salvar
+                <button onClick={() => setNewContact(selected.contact)} className="flex items-center gap-1.5 text-xs bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 px-3 py-1.5 rounded-lg font-medium">
+                  <UserPlus size={12} /> Salvar
                 </button>
               )}
               <LabelManager contact={selected.contact} onUpdate={(labels: string[]) => updateLabels(selected.contactId, labels)} />
@@ -528,39 +489,31 @@ export default function ConversasPage() {
           </div>
 
           {/* Mensagens */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5">
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5 bg-[#f0f2f5]">
             {messages.length === 0 && (
               <div className="flex items-center justify-center h-full text-gray-400 text-sm">Nenhuma mensagem</div>
             )}
             {messages.map((msg, i) => {
               const prev = messages[i - 1];
-              const thisDay = format(new Date(msg.sentAt), "dd/MM/yyyy");
+              const day = format(new Date(msg.sentAt), "dd/MM/yyyy");
               const prevDay = prev ? format(new Date(prev.sentAt), "dd/MM/yyyy") : null;
-              const showDate = thisDay !== prevDay;
               const isOut = msg.direction === "OUT";
               return (
                 <div key={msg.id}>
-                  {showDate && (
+                  {day !== prevDay && (
                     <div className="flex justify-center my-4">
-                      <span className="text-xs bg-white border border-gray-200 rounded-full px-3 py-1 text-gray-500 shadow-sm">
+                      <span className="text-[11px] bg-white rounded-full px-3 py-1 text-gray-500 shadow-sm border border-gray-100">
                         {isToday(new Date(msg.sentAt)) ? "Hoje" : isYesterday(new Date(msg.sentAt)) ? "Ontem" : format(new Date(msg.sentAt), "dd 'de' MMMM", { locale: ptBR })}
                       </span>
                     </div>
                   )}
                   <div className={`flex mb-1 ${isOut ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[72%] px-3 py-2 rounded-2xl text-sm shadow-sm ${isOut ? "bg-[#d9fdd3] text-gray-800 rounded-br-sm" : "bg-white text-gray-800 rounded-bl-sm"}`}>
-                      {/* Mídia recebida via webhook */}
-                      {msg.mediaType && !isOut && (
-                        <div className="mb-1">
-                          <MediaMessage messageId={msg.id} mediaType={msg.mediaType} />
-                        </div>
-                      )}
-                      {msg.content && (
-                        <p className="leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
-                      )}
-                      <div className="flex items-center justify-end gap-1 mt-0.5 text-gray-400">
-                        <span className="text-xs">{format(new Date(msg.sentAt), "HH:mm")}</span>
-                        {isOut && <CheckCheck size={12} className="text-blue-500" />}
+                    <div className={`max-w-[68%] px-3 py-2 rounded-2xl text-sm shadow-sm ${isOut ? "bg-[#d9fdd3] rounded-br-sm" : "bg-white rounded-bl-sm border border-gray-100"}`}>
+                      {msg.mediaType && !isOut && <div className="mb-1.5"><MediaBubble messageId={msg.id} mediaType={msg.mediaType} /></div>}
+                      {msg.content && <p className="text-gray-800 leading-relaxed whitespace-pre-wrap break-words text-sm">{msg.content}</p>}
+                      <div className="flex items-center justify-end gap-1 mt-0.5">
+                        <span className="text-[11px] text-gray-400">{format(new Date(msg.sentAt), "HH:mm")}</span>
+                        {isOut && <CheckCheck size={11} className="text-blue-400" />}
                       </div>
                     </div>
                   </div>
@@ -571,33 +524,27 @@ export default function ConversasPage() {
           </div>
 
           {/* Input */}
-          <div className="px-3 py-3 bg-white border-t border-gray-200 flex items-center gap-2">
-            <button onClick={() => setMediaModal(true)} title="Enviar mídia"
-              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors shrink-0">
-              <Paperclip size={19} />
+          <div className="flex items-center gap-2 px-4 py-3 bg-white border-t border-gray-100">
+            <button onClick={() => setAttachModal(true)} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 transition-colors shrink-0">
+              <Paperclip size={18} />
             </button>
             <input
-              ref={inputRef}
               value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (text.trim()) sendMessage({ message: text }); } }}
-              placeholder="Digite uma mensagem"
-              className="flex-1 bg-gray-100 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-colors"
+              onChange={e => setText(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && text.trim()) { e.preventDefault(); sendMsg({ message: text }); } }}
+              placeholder="Mensagem"
+              className="flex-1 bg-gray-100 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400 transition-all"
             />
-            <button onClick={() => { if (text.trim()) sendMessage({ message: text }); }} disabled={sending || !text.trim()}
-              className="w-9 h-9 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 text-white rounded-full flex items-center justify-center transition-colors shrink-0">
-              <Send size={16} />
+            <button onClick={() => { if (text.trim()) sendMsg({ message: text }); }} disabled={sending || !text.trim()}
+              className="w-9 h-9 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-full flex items-center justify-center transition-colors shrink-0">
+              <Send size={15} />
             </button>
           </div>
         </div>
       )}
 
-      {mediaModal && <MediaModal onSend={(p) => { handleMediaSend(p); }} onClose={() => setMediaModal(false)} />}
-      {newContact && (
-        <NewContactModal phone={newContact.phone} name={newContact.name}
-          onSave={() => { setNewContact(null); loadConversations(); }}
-          onClose={() => setNewContact(null)} />
-      )}
+      {attachModal && <AttachModal onSend={p => { handleAttach(p); }} onClose={() => setAttachModal(false)} />}
+      {newContact && <NewContactModal phone={newContact.phone} name={newContact.name} onSave={() => { setNewContact(null); loadConversations(); }} onClose={() => setNewContact(null)} />}
     </div>
   );
 }

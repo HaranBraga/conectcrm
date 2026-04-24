@@ -17,7 +17,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  const { message, mediaUrl, mediaType, linkUrl, base64, mimeType, fileName } = body;
+  const { message, mediaUrl, mediaType, linkUrl, linkTitle, linkDescription, base64, mimeType, fileName } = body;
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: params.id },
@@ -31,8 +31,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   try {
     if (linkUrl) {
-      await sendLink(conversation.contact.phone, linkUrl);
-      content = `🔗 ${linkUrl}`;
+      await sendLink(conversation.contact.phone, linkUrl, linkTitle, linkDescription);
+      content = linkTitle ? `${linkTitle}\n${linkUrl}` : `🔗 ${linkUrl}`;
     } else if (base64 && mimeType && fileName) {
       // Upload de arquivo real via base64
       const type: "image" | "video" | "audio" | "document" =

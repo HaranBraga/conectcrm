@@ -62,11 +62,11 @@ export async function getMediaBase64(rawData: any): Promise<{ base64: string; mi
 
 export async function sendLink(phone: string, link: string, title?: string, description?: string) {
   const number = phone.replace(/\D/g, "");
-  const { data } = await client.post(`/message/sendLink/${INSTANCE}`, {
+  const text = title ? `*${title}*\n${description ? description + "\n" : ""}${link}` : link;
+  const { data } = await client.post(`/message/sendText/${INSTANCE}`, {
     number,
-    link,
-    title: title || undefined,
-    description: description || undefined,
+    text,
+    options: { linkPreview: true },
   });
   return data;
 }
