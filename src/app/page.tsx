@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { prisma } from "@/lib/prisma";
 import { RefreshCw, Plus } from "lucide-react";
