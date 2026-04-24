@@ -18,6 +18,28 @@ export async function sendText(phone: string, message: string) {
   return data;
 }
 
+export async function sendMedia(phone: string, mediaUrl: string, mediaType: "image" | "video" | "document", caption?: string) {
+  const number = phone.replace(/\D/g, "");
+  const { data } = await client.post(`/message/sendMedia/${INSTANCE}`, {
+    number,
+    mediaUrl,
+    mediaType,
+    caption: caption || undefined,
+  });
+  return data;
+}
+
+export async function sendLink(phone: string, link: string, title?: string, description?: string) {
+  const number = phone.replace(/\D/g, "");
+  const { data } = await client.post(`/message/sendLink/${INSTANCE}`, {
+    number,
+    link,
+    title: title || undefined,
+    description: description || undefined,
+  });
+  return data;
+}
+
 export async function getInstanceStatus() {
   try {
     const { data } = await client.get(`/instance/fetchInstances`);

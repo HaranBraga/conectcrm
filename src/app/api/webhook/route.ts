@@ -57,13 +57,19 @@ export async function POST(req: NextRequest) {
     if (!contact) {
       const defaultStatus = await prisma.kanbanStatus.findFirst({ orderBy: { position: "asc" } });
       contact = await prisma.contact.create({
-        data: { name: pushName || phone, phone },
+        data: { name: pushName || phone, phone, source: "message" },
       });
       if (defaultStatus) {
         await prisma.conversation.create({
           data: { contactId: contact.id, statusId: defaultStatus.id, whatsappChatId: remoteJid },
         });
       }
+    } else if (contact.source === "manual" && !fromMe) {
+      // Se contato manual recebe mensagem, marca como "message" para aparecer no kanban
+      contact = await prisma.contact.update({
+        where: { id: contact.id },
+        data: { source: "message" },
+      });
     }
 
     // Busca ou cria conversa

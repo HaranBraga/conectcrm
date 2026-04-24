@@ -6,6 +6,7 @@ export async function GET() {
     orderBy: { position: "asc" },
     include: {
       conversations: {
+        where: { contact: { source: "message" } },
         include: {
           contact: { select: { id: true, name: true, phone: true, role: true, lastContactAt: true, lastMessage: true } },
         },

@@ -33,10 +33,8 @@ export async function POST(req: NextRequest) {
   if (!defaultStatus) return NextResponse.json({ error: "Crie ao menos um status no kanban primeiro" }, { status: 400 });
 
   const contact = await prisma.contact.create({
-    data: { name, phone, email, role: role ?? "APOIADOR", parentId: parentId ?? null, notes },
+    data: { name, phone, email, role: role ?? "APOIADOR", parentId: parentId ?? null, notes, source: "manual" },
   });
-
-  await prisma.conversation.create({ data: { contactId: contact.id, statusId: defaultStatus.id } });
 
   return NextResponse.json(contact, { status: 201 });
 }

@@ -27,19 +27,21 @@ enum DispatchStatus {
 }
 
 model Contact {
-  id            String    @id @default(cuid())
-  name          String
-  phone         String    @unique
-  email         String?
-  role          Role      @default(APOIADOR)
-  parentId      String?
-  parent        Contact?  @relation("Hierarchy", fields: [parentId], references: [id])
-  children      Contact[] @relation("Hierarchy")
-  lastContactAt DateTime?
-  lastMessage   String?
-  notes         String?
-  externalId    String?
-  labels        String[]  @default([])
+  id               String    @id @default(cuid())
+  name             String
+  phone            String    @unique
+  email            String?
+  role             Role      @default(APOIADOR)
+  parentId         String?
+  parent           Contact?  @relation("Hierarchy", fields: [parentId], references: [id])
+  children         Contact[] @relation("Hierarchy")
+  lastContactAt    DateTime?
+  lastMessage      String?
+  notes            String?
+  externalId       String?
+  labels           String[]  @default([])
+  source           String    @default("message")
+  profilePhotoUrl  String?
 
   conversations Conversation[]
   groupMembers  GroupMember[]
@@ -49,6 +51,7 @@ model Contact {
 
   @@index([phone])
   @@index([role])
+  @@index([source])
 }
 
 model KanbanStatus {
