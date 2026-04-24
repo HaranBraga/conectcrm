@@ -91,6 +91,17 @@ export async function POST(req: NextRequest) {
       if (existing) return NextResponse.json({ ok: true });
     }
 
+    // Detecta tipo de mídia para salvar rawData para download posterior
+    const msg = data?.message ?? {};
+    let mediaType: string | null = null;
+    if (msg.imageMessage)    mediaType = "image";
+    else if (msg.videoMessage)    mediaType = "video";
+    else if (msg.audioMessage)    mediaType = "audio";
+    else if (msg.documentMessage) mediaType = "document";
+    else if (msg.stickerMessage)  mediaType = "sticker";
+
+    const rawData = mediaType ? { key: data?.key, message: msg } : null;
+
     // Salva mensagem
     await prisma.message.create({
       data: {
@@ -98,6 +109,8 @@ export async function POST(req: NextRequest) {
         content: text,
         direction: fromMe ? "OUT" : "IN",
         whatsappMsgId: msgId || null,
+        mediaType,
+        rawData: rawData as any,
         sentAt: ts,
       },
     });

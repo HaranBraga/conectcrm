@@ -155,20 +155,55 @@ function NewContactModal({ phone, name, onSave, onClose }: any) {
 
 // ── Media Modal ────────────────────────────────────────────────────────────
 
-type MediaType = "image" | "video" | "document" | "link";
+type MediaTab = "file" | "link";
 
-const MEDIA_OPTIONS: { type: MediaType; label: string; icon: any; placeholder: string; accept?: string }[] = [
-  { type: "image",    label: "Imagem",    icon: ImageIcon,  placeholder: "https://exemplo.com/foto.jpg" },
-  { type: "video",    label: "Vídeo",     icon: Video,      placeholder: "https://exemplo.com/video.mp4" },
-  { type: "document", label: "Arquivo",   icon: FileText,   placeholder: "https://exemplo.com/arquivo.pdf" },
-  { type: "link",     label: "Link",      icon: Link2,      placeholder: "https://exemplo.com" },
-];
+interface MediaPayload {
+  base64?: string; mimeType?: string; fileName?: string;
+  linkUrl?: string; caption?: string;
+}
 
-function MediaModal({ onSend, onClose }: { onSend: (type: MediaType, url: string, caption?: string) => void; onClose: () => void }) {
-  const [tab, setTab] = useState<MediaType>("image");
-  const [url, setUrl] = useState("");
+function MediaModal({ onSend, onClose }: { onSend: (p: MediaPayload) => void; onClose: () => void }) {
+  const [tab, setTab] = useState<MediaTab>("file");
   const [caption, setCaption] = useState("");
-  const opt = MEDIA_OPTIONS.find((o) => o.type === tab)!;
+  const [link, setLink] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFile(f);
+    if (f.type.startsWith("image/")) {
+      setPreview(URL.createObjectURL(f));
+    } else {
+      setPreview(null);
+    }
+  }
+
+  async function send() {
+    setLoading(true);
+    try {
+      if (tab === "link") {
+        if (!link.trim()) return;
+        onSend({ linkUrl: link.trim(), caption: caption || undefined });
+      } else {
+        if (!file) return;
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            // Remove o prefixo "data:mimetype;base64,"
+            resolve(result.split(",")[1]);
+          };
+          reader.readAsDataURL(file);
+        });
+        onSend({ base64, mimeType: file.type, fileName: file.name, caption: caption || undefined });
+      }
+      onClose();
+    } finally { setLoading(false); }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
@@ -178,37 +213,126 @@ function MediaModal({ onSend, onClose }: { onSend: (type: MediaType, url: string
           <h3 className="font-semibold text-gray-900">Enviar mídia</h3>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400"><X size={16} /></button>
         </div>
+
         <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">
-          {MEDIA_OPTIONS.map(({ type, label, icon: Icon }) => (
-            <button key={type} onClick={() => setTab(type)} className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg font-medium transition-all ${tab === type ? "bg-white shadow text-brand-700" : "text-gray-500 hover:text-gray-700"}`}>
-              <Icon size={13} />{label}
-            </button>
-          ))}
+          <button onClick={() => setTab("file")} className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg font-medium transition-all ${tab === "file" ? "bg-white shadow text-brand-700" : "text-gray-500"}`}>
+            <Paperclip size={13} /> Arquivo
+          </button>
+          <button onClick={() => setTab("link")} className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg font-medium transition-all ${tab === "link" ? "bg-white shadow text-brand-700" : "text-gray-500"}`}>
+            <Link2 size={13} /> Link
+          </button>
         </div>
-        <div className="flex flex-col gap-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">URL {opt.label}</label>
-            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={opt.placeholder} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-          </div>
-          {tab !== "link" && (
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Legenda (opcional)</label>
-              <input value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Adicione uma legenda..." className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+
+        {tab === "file" ? (
+          <div className="flex flex-col gap-3">
+            <div
+              onClick={() => fileRef.current?.click()}
+              className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors"
+            >
+              {file ? (
+                <div className="flex flex-col items-center gap-2">
+                  {preview
+                    ? <img src={preview} className="max-h-32 rounded-lg object-contain" alt="preview" />
+                    : <FileText size={32} className="text-gray-400" />
+                  }
+                  <p className="text-sm font-medium text-gray-700 truncate max-w-full">{file.name}</p>
+                  <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(1)} KB · {file.type}</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-gray-400">
+                  <Paperclip size={28} />
+                  <p className="text-sm font-medium">Clique para selecionar</p>
+                  <p className="text-xs">Imagem, vídeo, PDF, áudio...</p>
+                </div>
+              )}
             </div>
-          )}
-          {url && tab === "image" && (
-            <img src={url} alt="preview" className="rounded-lg max-h-32 object-cover w-full" onError={() => {}} />
-          )}
-        </div>
+            <input ref={fileRef} type="file" className="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip" onChange={onFileChange} />
+            <input value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Legenda (opcional)" className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://..." className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <input value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Descrição (opcional)" className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+        )}
+
         <div className="flex gap-2 mt-4">
           <button onClick={onClose} className="flex-1 border border-gray-200 rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
-          <button onClick={() => { if (url.trim()) { onSend(tab, url.trim(), caption.trim() || undefined); onClose(); } }} disabled={!url.trim()} className="flex-1 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-2">
-            <Send size={14} /> Enviar
+          <button onClick={send} disabled={loading || (tab === "file" ? !file : !link.trim())} className="flex-1 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-2">
+            {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={14} />}
+            {loading ? "Enviando..." : "Enviar"}
           </button>
         </div>
       </div>
     </div>
   );
+}
+
+// ── Exibição de mídia recebida ─────────────────────────────────────────────
+
+function MediaMessage({ messageId, mediaType }: { messageId: string; mediaType: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/messages/${messageId}/media`);
+      if (!r.ok) throw new Error();
+      const blob = await r.blob();
+      setSrc(URL.createObjectURL(blob));
+    } catch { setError(true); }
+    finally { setLoading(false); }
+  }
+
+  if (error) return <p className="text-xs text-red-400">Mídia indisponível</p>;
+
+  if (mediaType === "image") {
+    if (!src) return (
+      <button onClick={load} disabled={loading} className="flex items-center gap-2 text-xs text-brand-600 hover:underline">
+        {loading ? <div className="w-3 h-3 border border-brand-600 border-t-transparent rounded-full animate-spin" /> : <ImageIcon size={14} />}
+        {loading ? "Carregando..." : "Ver imagem"}
+      </button>
+    );
+    return <img src={src} className="rounded-xl max-w-full max-h-48 object-contain cursor-pointer" onClick={() => window.open(src, "_blank")} alt="imagem" />;
+  }
+
+  if (mediaType === "video") {
+    if (!src) return (
+      <button onClick={load} disabled={loading} className="flex items-center gap-2 text-xs text-brand-600 hover:underline">
+        {loading ? <div className="w-3 h-3 border border-brand-600 border-t-transparent rounded-full animate-spin" /> : <Video size={14} />}
+        {loading ? "Carregando..." : "Ver vídeo"}
+      </button>
+    );
+    return <video src={src} controls className="rounded-xl max-w-full max-h-48" />;
+  }
+
+  if (mediaType === "audio") {
+    if (!src) return (
+      <button onClick={load} disabled={loading} className="flex items-center gap-2 text-xs text-brand-600 hover:underline">
+        {loading ? <div className="w-3 h-3 border border-brand-600 border-t-transparent rounded-full animate-spin" /> : <span>🎵</span>}
+        {loading ? "Carregando..." : "Ouvir áudio"}
+      </button>
+    );
+    return <audio src={src} controls className="w-full max-w-xs" />;
+  }
+
+  if (mediaType === "document") {
+    if (!src) return (
+      <button onClick={load} disabled={loading} className="flex items-center gap-2 text-xs text-brand-600 hover:underline">
+        {loading ? <div className="w-3 h-3 border border-brand-600 border-t-transparent rounded-full animate-spin" /> : <FileText size={14} />}
+        {loading ? "Carregando..." : "Baixar arquivo"}
+      </button>
+    );
+    return (
+      <a href={src} download className="flex items-center gap-2 text-xs text-brand-600 hover:underline">
+        <FileText size={14} /> Baixar arquivo
+      </a>
+    );
+  }
+
+  return null;
 }
 
 // ── Página principal ───────────────────────────────────────────────────────
@@ -277,7 +401,7 @@ export default function ConversasPage() {
     setRefreshing(false);
   }
 
-  async function sendMessage(payload: { message?: string; mediaUrl?: string; mediaType?: string; linkUrl?: string }) {
+  async function sendMessage(payload: { message?: string; mediaUrl?: string; mediaType?: string; linkUrl?: string; base64?: string; mimeType?: string; fileName?: string; caption?: string }) {
     if (!selected) return;
     setSending(true);
     try {
@@ -295,11 +419,11 @@ export default function ConversasPage() {
     finally { setSending(false); }
   }
 
-  async function handleMediaSend(type: MediaType, url: string, caption?: string) {
-    if (type === "link") {
-      await sendMessage({ linkUrl: url });
-    } else {
-      await sendMessage({ mediaUrl: url, mediaType: type, message: caption });
+  async function handleMediaSend(p: MediaPayload) {
+    if (p.linkUrl) {
+      await sendMessage({ linkUrl: p.linkUrl, message: p.caption });
+    } else if (p.base64) {
+      await sendMessage({ base64: p.base64, mimeType: p.mimeType, fileName: p.fileName, message: p.caption });
     }
   }
 
@@ -425,17 +549,16 @@ export default function ConversasPage() {
                   )}
                   <div className={`flex mb-1 ${isOut ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[72%] px-3 py-2 rounded-2xl text-sm shadow-sm ${isOut ? "bg-[#d9fdd3] text-gray-800 rounded-br-sm" : "bg-white text-gray-800 rounded-bl-sm"}`}>
-                      {msg.content.startsWith("🖼️") || msg.content.startsWith("🎥") ? (
-                        <div>
-                          {msg.content.startsWith("🖼️") && (
-                            <p className="text-2xl mb-1">🖼️</p>
-                          )}
-                          <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                      {/* Mídia recebida via webhook */}
+                      {msg.mediaType && !isOut && (
+                        <div className="mb-1">
+                          <MediaMessage messageId={msg.id} mediaType={msg.mediaType} />
                         </div>
-                      ) : (
+                      )}
+                      {msg.content && (
                         <p className="leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
                       )}
-                      <div className={`flex items-center justify-end gap-1 mt-0.5 ${isOut ? "text-gray-400" : "text-gray-400"}`}>
+                      <div className="flex items-center justify-end gap-1 mt-0.5 text-gray-400">
                         <span className="text-xs">{format(new Date(msg.sentAt), "HH:mm")}</span>
                         {isOut && <CheckCheck size={12} className="text-blue-500" />}
                       </div>
@@ -469,7 +592,7 @@ export default function ConversasPage() {
         </div>
       )}
 
-      {mediaModal && <MediaModal onSend={handleMediaSend} onClose={() => setMediaModal(false)} />}
+      {mediaModal && <MediaModal onSend={(p) => { handleMediaSend(p); }} onClose={() => setMediaModal(false)} />}
       {newContact && (
         <NewContactModal phone={newContact.phone} name={newContact.name}
           onSave={() => { setNewContact(null); loadConversations(); }}

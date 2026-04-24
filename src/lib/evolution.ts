@@ -23,10 +23,41 @@ export async function sendMedia(phone: string, mediaUrl: string, mediaType: "ima
   const { data } = await client.post(`/message/sendMedia/${INSTANCE}`, {
     number,
     mediaUrl,
-    mediaType,
+    mediatype: mediaType,
     caption: caption || undefined,
   });
   return data;
+}
+
+export async function sendMediaBase64(
+  phone: string,
+  base64: string,
+  mimeType: string,
+  fileName: string,
+  mediaType: "image" | "video" | "audio" | "document",
+  caption?: string
+) {
+  const number = phone.replace(/\D/g, "");
+  const { data } = await client.post(`/message/sendMedia/${INSTANCE}`, {
+    number,
+    mediatype: mediaType,
+    mimetype: mimeType,
+    media: base64,
+    fileName,
+    caption: caption || undefined,
+  });
+  return data;
+}
+
+export async function getMediaBase64(rawData: any): Promise<{ base64: string; mimetype: string } | null> {
+  try {
+    const { data } = await client.post(`/chat/getBase64FromMediaMessage/${INSTANCE}`, {
+      message: rawData,
+    });
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 export async function sendLink(phone: string, link: string, title?: string, description?: string) {

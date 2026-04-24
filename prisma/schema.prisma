@@ -88,6 +88,8 @@ model Message {
   content        String
   direction      Direction    @default(OUT)
   whatsappMsgId  String?
+  mediaType      String?
+  rawData        Json?
   sentAt         DateTime     @default(now())
 }
 
