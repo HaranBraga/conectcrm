@@ -4,17 +4,24 @@ import { prisma } from "@/lib/prisma";
 function extractText(data: any): string {
   const msg = data?.message;
   if (!msg) return "";
-  return (
-    msg.conversation ||
-    msg.extendedTextMessage?.text ||
-    msg.imageMessage?.caption ||
-    msg.videoMessage?.caption ||
-    msg.documentMessage?.caption ||
-    msg.audioMessage ? "🎵 Áudio" :
-    msg.stickerMessage ? "🎨 Figurinha" :
-    msg.locationMessage ? "📍 Localização" :
-    "[mensagem]"
-  );
+  if (msg.conversation) return msg.conversation;
+  if (msg.extendedTextMessage?.text) return msg.extendedTextMessage.text;
+  if (msg.imageMessage?.caption) return `🖼️ ${msg.imageMessage.caption}`;
+  if (msg.imageMessage) return "🖼️ Imagem";
+  if (msg.videoMessage?.caption) return `🎥 ${msg.videoMessage.caption}`;
+  if (msg.videoMessage) return "🎥 Vídeo";
+  if (msg.audioMessage) return "🎵 Áudio";
+  if (msg.documentMessage) return `📄 ${msg.documentMessage.fileName || "Documento"}`;
+  if (msg.stickerMessage) return "🎨 Figurinha";
+  if (msg.locationMessage) return "📍 Localização";
+  if (msg.reactionMessage) return `${msg.reactionMessage.text || "👍"} reação`;
+  if (msg.contactMessage) return `👤 ${msg.contactMessage.displayName || "Contato"}`;
+  if (msg.listMessage) return `📋 ${msg.listMessage.description || "Lista"}`;
+  if (msg.buttonsMessage) return msg.buttonsMessage.contentText || "📌 Botões";
+  if (msg.templateMessage) return msg.templateMessage.hydratedTemplate?.hydratedContentText || "📌 Template";
+  const keys = Object.keys(msg);
+  if (keys.length > 0) return `[${keys[0]}]`;
+  return "[mensagem]";
 }
 
 export async function POST(req: NextRequest) {
@@ -22,7 +29,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { event, data } = body;
 
-    if (event !== "messages.upsert" && event !== "MESSAGES_UPSERT") {
+    const isIncoming = event === "messages.upsert" || event === "MESSAGES_UPSERT";
+    const isOutgoing = event === "send.message" || event === "SEND_MESSAGE";
+    if (!isIncoming && !isOutgoing) {
       return NextResponse.json({ ok: true });
     }
 
