@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sidebar-width: 240px;
+}
+
+body {
+  @apply bg-gray-50 text-gray-900 antialiased;
+}
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+.kanban-column {
+  @apply flex flex-col bg-gray-100 rounded-xl p-3 min-w-[280px] max-w-[280px];
+  min-height: 200px;
+}
+
+.kanban-card {
+  @apply bg-white rounded-lg p-3 shadow-sm border border-gray-200 cursor-grab active:cursor-grabbing select-none;
+  transition: box-shadow 0.15s;
+}
+.kanban-card:hover { @apply shadow-md; }
+
+.role-badge {
+  @apply text-xs font-semibold px-2 py-0.5 rounded-full;
+}
