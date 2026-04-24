@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = process.env.EVOLUTION_API_URL ?? "";
+const BASE_URL = (process.env.EVOLUTION_API_URL ?? "").replace(/\/$/, "");
 const API_KEY = process.env.EVOLUTION_API_KEY ?? "";
 const INSTANCE = process.env.EVOLUTION_INSTANCE ?? "";
 

@@ -24,4 +24,4 @@ COPY --from=builder /app/prisma ./prisma
 EXPOSE 3000
 
 # Roda migrations e inicia o servidor
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm start"]
