@@ -20,8 +20,9 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/scripts ./scripts
 
 EXPOSE 3000
 
-# Roda migrations e inicia o servidor
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm start"]
+# Sincroniza schema, seed inicial e inicia
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node scripts/startup.js && npm start"]

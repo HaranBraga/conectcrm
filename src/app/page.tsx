@@ -6,7 +6,7 @@ import { RefreshCw, Plus } from "lucide-react";
 import Link from "next/link";
 
 async function getColumns() {
-  return prisma.kanbanStatus.findMany({
+  try { return await prisma.kanbanStatus.findMany({
     orderBy: { position: "asc" },
     include: {
       conversations: {
@@ -16,7 +16,7 @@ async function getColumns() {
         orderBy: { updatedAt: "desc" },
       },
     },
-  });
+  }); } catch { return []; }
 }
 
 export default async function KanbanPage() {

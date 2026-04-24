@@ -39,6 +39,7 @@ model Contact {
   lastMessage   String?
   notes         String?
   externalId    String?
+  labels        String[]  @default([])
 
   conversations Conversation[]
   groupMembers  GroupMember[]
