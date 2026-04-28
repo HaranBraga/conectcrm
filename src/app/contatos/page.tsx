@@ -19,9 +19,11 @@ function ContactForm({ initial, onSave, onClose, contacts, roles }: {
   contacts: Contact[]; roles: PersonRole[];
 }) {
   const [form, setForm] = useState({
-    name: "", phone: "", email: "", roleId: roles[roles.length - 1]?.id ?? "", parentId: "", notes: "",
+    name: "", phone: "", email: "", notes: "",
     ...initial,
+    phone: initial?.phone ? (initial.phone.startsWith("55") ? initial.phone.slice(2) : initial.phone) : "",
     roleId: initial?.roleId ?? roles[roles.length - 1]?.id ?? "",
+    parentId: initial?.parentId ?? "",
   });
   const [saving, setSaving] = useState(false);
   const f = (k: string) => (e: any) => setForm((p) => ({ ...p, [k]: e.target.value }));
@@ -31,7 +33,9 @@ function ContactForm({ initial, onSave, onClose, contacts, roles }: {
     try {
       const method = initial?.id ? "PUT" : "POST";
       const url = initial?.id ? `/api/contacts/${initial.id}` : "/api/contacts";
-      const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, parentId: form.parentId || null }) });
+      const digits = form.phone.replace(/\D/g, "");
+      const phone = digits.startsWith("55") ? digits : `55${digits}`;
+      const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, phone, parentId: form.parentId || null }) });
       if (!r.ok) { const d = await r.json(); toast.error(d.error); return; }
       toast.success(initial?.id ? "Contato atualizado!" : "Contato criado!");
       onSave();
@@ -48,7 +52,13 @@ function ContactForm({ initial, onSave, onClose, contacts, roles }: {
     <form onSubmit={submit} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label><input required value={form.name} onChange={f("name")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" /></div>
-        <div><label className="block text-sm font-medium text-gray-700 mb-1">Telefone * <span className="text-gray-400">(somente números)</span></label><input required value={form.phone} onChange={f("phone")} placeholder="5511999999999" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" /></div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Telefone * <span className="text-gray-400 text-xs">DDD + número</span></label>
+          <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-brand-500">
+            <span className="px-3 py-2 bg-gray-50 text-gray-400 text-sm border-r border-gray-200 select-none">+55</span>
+            <input required value={form.phone} onChange={f("phone")} placeholder="11999999999" className="flex-1 px-3 py-2 text-sm focus:outline-none" />
+          </div>
+        </div>
         <div><label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label><input type="email" value={form.email} onChange={f("email")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" /></div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Cargo (Hierarquia)</label>
@@ -151,7 +161,7 @@ export default function ContatosPage() {
                         {c.parent && <span className="text-xs text-gray-400 flex items-center gap-0.5"><ChevronRight size={10} />{c.parent.name}</span>}
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
-                        <span className="flex items-center gap-1"><Phone size={10} />{c.phone}</span>
+                        <span className="flex items-center gap-1"><Phone size={10} />{c.phone.startsWith("55") ? c.phone.slice(2) : c.phone}</span>
                         {c.lastContactAt && (
                           <span className="flex items-center gap-1 text-gray-400"><Clock size={10} />
                             {formatDistanceToNow(new Date(c.lastContactAt), { locale: ptBR, addSuffix: true })}
