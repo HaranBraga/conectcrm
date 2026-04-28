@@ -56,8 +56,10 @@ export async function POST(req: NextRequest) {
     let contact = await prisma.contact.findUnique({ where: { phone } });
     if (!contact) {
       const defaultStatus = await prisma.kanbanStatus.findFirst({ orderBy: { position: "asc" } });
+      const defaultRole = await prisma.personRole.findFirst({ orderBy: { level: "desc" } });
+      if (!defaultRole) return NextResponse.json({ ok: true });
       contact = await prisma.contact.create({
-        data: { name: pushName || phone, phone, source: "message" },
+        data: { name: pushName || phone, phone, roleId: defaultRole.id, source: "message" },
       });
       if (defaultStatus) {
         await prisma.conversation.create({

@@ -9,7 +9,8 @@
     "db:migrate": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "db:seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts"
+    "db:seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
+    "db:setup-roles": "npx prisma db execute --file ./prisma/setup-roles.sql --schema ./prisma/schema.prisma"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^16.6.0",

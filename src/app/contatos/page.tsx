@@ -1,30 +1,33 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Search, Clock, Phone, ChevronRight, Trash2, Edit2 } from "lucide-react";
-import { RoleBadge, ROLE_LABELS, ROLE_ORDER } from "@/components/ui/RoleBadge";
+import { RoleBadge, type PersonRole } from "@/components/ui/RoleBadge";
 import { Modal } from "@/components/ui/Modal";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
 
-const ROLES = ROLE_ORDER;
-
 interface Contact {
   id: string; name: string; phone: string; email?: string;
-  role: string; parentId?: string; parent?: any;
+  roleId: string; role: PersonRole; parentId?: string; parent?: any;
   lastContactAt?: string; lastMessage?: string; notes?: string;
   _count?: { children: number };
 }
 
-function ContactForm({ initial, onSave, onClose, contacts }: { initial?: Partial<Contact>; onSave: () => void; onClose: () => void; contacts: Contact[] }) {
-  const [form, setForm] = useState({ name: "", phone: "", email: "", role: "APOIADOR", parentId: "", notes: "", ...initial });
+function ContactForm({ initial, onSave, onClose, contacts, roles }: {
+  initial?: Partial<Contact>; onSave: () => void; onClose: () => void;
+  contacts: Contact[]; roles: PersonRole[];
+}) {
+  const [form, setForm] = useState({
+    name: "", phone: "", email: "", roleId: roles[roles.length - 1]?.id ?? "", parentId: "", notes: "",
+    ...initial,
+    roleId: initial?.roleId ?? roles[roles.length - 1]?.id ?? "",
+  });
   const [saving, setSaving] = useState(false);
-
   const f = (k: string) => (e: any) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
   async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
+    e.preventDefault(); setSaving(true);
     try {
       const method = initial?.id ? "PUT" : "POST";
       const url = initial?.id ? `/api/contacts/${initial.id}` : "/api/contacts";
@@ -35,10 +38,10 @@ function ContactForm({ initial, onSave, onClose, contacts }: { initial?: Partial
     } finally { setSaving(false); }
   }
 
+  const currentRole = roles.find(r => r.id === form.roleId);
   const eligibleParents = contacts.filter((c) => {
-    const roleIdx = ROLE_ORDER.indexOf(form.role);
-    const parentIdx = ROLE_ORDER.indexOf(c.role);
-    return c.id !== initial?.id && parentIdx < roleIdx;
+    const parentRole = roles.find(r => r.id === c.roleId);
+    return c.id !== initial?.id && parentRole && currentRole && parentRole.level < currentRole.level;
   });
 
   return (
@@ -49,15 +52,15 @@ function ContactForm({ initial, onSave, onClose, contacts }: { initial?: Partial
         <div><label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label><input type="email" value={form.email} onChange={f("email")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" /></div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Cargo (Hierarquia)</label>
-          <select value={form.role} onChange={f("role")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-            {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+          <select value={form.roleId} onChange={f("roleId")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            {roles.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Responsável (superior)</label>
           <select value={form.parentId} onChange={f("parentId")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="">— Nenhum —</option>
-            {eligibleParents.map((c) => <option key={c.id} value={c.id}>{c.name} ({ROLE_LABELS[c.role]})</option>)}
+            {eligibleParents.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.role.label})</option>)}
           </select>
         </div>
         <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Observações</label><textarea rows={3} value={form.notes} onChange={f("notes")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none" /></div>
@@ -72,19 +75,26 @@ function ContactForm({ initial, onSave, onClose, contacts }: { initial?: Partial
 
 export default function ContatosPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [roles, setRoles] = useState<PersonRole[]>([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [modal, setModal] = useState<"new" | "edit" | null>(null);
   const [editing, setEditing] = useState<Contact | null>(null);
 
+  const loadRoles = useCallback(async () => {
+    const r = await fetch("/api/roles");
+    setRoles(await r.json());
+  }, []);
+
   const load = useCallback(async () => {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
-    if (roleFilter) params.set("role", roleFilter);
+    if (roleFilter) params.set("roleId", roleFilter);
     const r = await fetch(`/api/contacts?${params}`);
     setContacts(await r.json());
   }, [search, roleFilter]);
 
+  useEffect(() => { loadRoles(); }, [loadRoles]);
   useEffect(() => { load(); }, [load]);
 
   async function del(id: string, name: string) {
@@ -94,8 +104,8 @@ export default function ContatosPage() {
     load();
   }
 
-  const grouped = ROLE_ORDER.reduce<Record<string, Contact[]>>((acc, role) => {
-    acc[role] = contacts.filter((c) => c.role === role);
+  const grouped = roles.reduce<Record<string, Contact[]>>((acc, role) => {
+    acc[role.id] = contacts.filter((c) => c.roleId === role.id);
     return acc;
   }, {});
 
@@ -115,16 +125,16 @@ export default function ContatosPage() {
         </div>
         <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">Todos os cargos</option>
-          {ROLE_ORDER.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+          {roles.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
         </select>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-        {ROLE_ORDER.map((role) => {
-          const group = grouped[role];
+        {roles.map((role) => {
+          const group = grouped[role.id] ?? [];
           if (group.length === 0) return null;
           return (
-            <div key={role}>
+            <div key={role.id}>
               <div className="flex items-center gap-2 mb-3">
                 <RoleBadge role={role} />
                 <span className="text-xs text-gray-400">{group.length}</span>
@@ -171,7 +181,13 @@ export default function ContatosPage() {
       </div>
 
       <Modal open={modal !== null} onClose={() => setModal(null)} title={modal === "edit" ? "Editar Contato" : "Novo Contato"}>
-        <ContactForm initial={editing ?? undefined} contacts={contacts} onSave={() => { setModal(null); load(); }} onClose={() => setModal(null)} />
+        <ContactForm
+          initial={editing ?? undefined}
+          contacts={contacts}
+          roles={roles}
+          onSave={() => { setModal(null); load(); }}
+          onClose={() => setModal(null)}
+        />
       </Modal>
     </div>
   );

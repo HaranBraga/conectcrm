@@ -4,11 +4,12 @@ import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { Plus, RefreshCw, Settings } from "lucide-react";
 import Link from "next/link";
 import { Modal } from "@/components/ui/Modal";
-import { ROLE_LABELS, ROLE_ORDER } from "@/components/ui/RoleBadge";
+import { type PersonRole } from "@/components/ui/RoleBadge";
 import toast from "react-hot-toast";
 
-function NewContactQuick({ onSave, onClose, defaultStatusId }: any) {
-  const [form, setForm] = useState({ name: "", phone: "", role: "APOIADOR" });
+function NewContactQuick({ onSave, onClose, roles }: { onSave: () => void; onClose: () => void; roles: PersonRole[] }) {
+  const defaultRoleId = roles[roles.length - 1]?.id ?? "";
+  const [form, setForm] = useState({ name: "", phone: "", roleId: defaultRoleId });
   const [saving, setSaving] = useState(false);
   const f = (k: string) => (e: any) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
@@ -17,7 +18,7 @@ function NewContactQuick({ onSave, onClose, defaultStatusId }: any) {
     try {
       const r = await fetch("/api/contacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
       if (!r.ok) { const d = await r.json(); toast.error(d.error); return; }
-      toast.success("Contato adicionado ao kanban!"); onSave();
+      toast.success("Contato adicionado!"); onSave();
     } finally { setSaving(false); }
   }
 
@@ -27,8 +28,8 @@ function NewContactQuick({ onSave, onClose, defaultStatusId }: any) {
       <div><label className="block text-sm font-medium text-gray-700 mb-1">Telefone * <span className="text-gray-400">(somente números)</span></label><input required value={form.phone} onChange={f("phone")} placeholder="5511999999999" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" /></div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Cargo</label>
-        <select value={form.role} onChange={f("role")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-          {ROLE_ORDER.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+        <select value={form.roleId} onChange={f("roleId")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          {roles.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
         </select>
       </div>
       <div className="flex justify-end gap-3 pt-2">
@@ -41,6 +42,7 @@ function NewContactQuick({ onSave, onClose, defaultStatusId }: any) {
 
 export default function KanbanPage() {
   const [columns, setColumns] = useState<any[]>([]);
+  const [roles, setRoles] = useState<PersonRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [modal, setModal] = useState(false);
@@ -48,9 +50,10 @@ export default function KanbanPage() {
   const load = useCallback(async () => {
     try {
       setError(false);
-      const r = await fetch("/api/kanban");
-      if (!r.ok) throw new Error();
-      setColumns(await r.json());
+      const [kanbanRes, rolesRes] = await Promise.all([fetch("/api/kanban"), fetch("/api/roles")]);
+      if (!kanbanRes.ok) throw new Error();
+      setColumns(await kanbanRes.json());
+      setRoles(await rolesRes.json());
     } catch {
       setError(true);
     } finally {
@@ -112,7 +115,7 @@ export default function KanbanPage() {
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title="Novo Contato" size="sm">
-        <NewContactQuick onSave={() => { setModal(false); load(); }} onClose={() => setModal(false)} />
+        <NewContactQuick roles={roles} onSave={() => { setModal(false); load(); }} onClose={() => setModal(false)} />
       </Modal>
     </div>
   );
