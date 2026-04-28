@@ -1,24 +1,18 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Search, Send, Tag, X, Plus, UserPlus, RefreshCw,
+  Search, Send, X, UserPlus, RefreshCw,
   CheckCheck, Paperclip, Link2, FileText, Mic,
+  MessageSquarePlus, Archive, ArchiveRestore,
 } from "lucide-react";
-import { RoleBadge, ROLE_LABELS, ROLE_ORDER } from "@/components/ui/RoleBadge";
+import { RoleBadge } from "@/components/ui/RoleBadge";
+import { LabelManager, getLabelStyle, type LabelDef } from "@/components/ui/LabelManager";
+import { NewConversationModal } from "@/components/ui/NewConversationModal";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
 
-// ── Labels ──────────────────────────────────────────────────────────────────
-
-const LABEL_COLORS = [
-  { name: "Interessado",  color: "#10b981" },
-  { name: "Sem retorno",  color: "#f59e0b" },
-  { name: "Frio",         color: "#3b82f6" },
-  { name: "VIP",          color: "#8b5cf6" },
-  { name: "Urgente",      color: "#ef4444" },
-  { name: "Reunião",      color: "#ec4899" },
-];
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function msgTime(d: string) {
   const date = new Date(d);
@@ -27,14 +21,13 @@ function msgTime(d: string) {
   return format(date, "dd/MM", { locale: ptBR });
 }
 
-// ── Avatar estável ──────────────────────────────────────────────────────────
+// ── Avatar ────────────────────────────────────────────────────────────────────
 
 function Avatar({ contact, size = 40 }: { contact: any; size?: number }) {
   const [err, setErr] = useState(false);
-  const photo = contact?.profilePhotoUrl;
+  const photo   = contact?.profilePhotoUrl;
   const initial = (contact?.name?.[0] ?? "?").toUpperCase();
   const s = { width: size, height: size, minWidth: size, minHeight: size };
-
   if (photo && !err) {
     return <img src={photo} alt="" style={s} className="rounded-full object-cover shrink-0" onError={() => setErr(true)} />;
   }
@@ -45,71 +38,10 @@ function Avatar({ contact, size = 40 }: { contact: any; size?: number }) {
   );
 }
 
-// ── Etiquetas ───────────────────────────────────────────────────────────────
-
-function LabelManager({ contact, onUpdate }: any) {
-  const [open, setOpen] = useState(false);
-  const [custom, setCustom] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-  const labels: string[] = contact?.labels ?? [];
-
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
-
-  async function toggle(label: string) {
-    const next = labels.includes(label) ? labels.filter(l => l !== label) : [...labels, label];
-    const r = await fetch(`/api/contacts/${contact.id}/labels`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ labels: next }) });
-    if (r.ok) onUpdate(next);
-  }
-
-  async function addCustom() {
-    if (!custom.trim()) return;
-    const next = [...labels, custom.trim()];
-    const r = await fetch(`/api/contacts/${contact.id}/labels`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ labels: next }) });
-    if (r.ok) { onUpdate(next); setCustom(""); }
-  }
-
-  return (
-    <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(v => !v)} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-indigo-600 px-2 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors">
-        <Tag size={13} />{labels.length > 0 ? `${labels.length} etiqueta${labels.length > 1 ? "s" : ""}` : "Etiquetas"}
-      </button>
-      {open && (
-        <div className="absolute right-0 top-9 z-20 bg-white border border-gray-100 rounded-2xl shadow-xl p-4 w-64">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Etiquetas</p>
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {LABEL_COLORS.map(({ name, color }) => (
-              <button key={name} onClick={() => toggle(name)}
-                className="text-xs px-2.5 py-1 rounded-full border transition-all"
-                style={labels.includes(name) ? { backgroundColor: color, color: "#fff", borderColor: "transparent" } : { borderColor: "#e5e7eb", color: "#374151" }}>
-                {name}
-              </button>
-            ))}
-          </div>
-          {labels.filter(l => !LABEL_COLORS.find(lc => lc.name === l)).map(l => (
-            <div key={l} className="flex items-center gap-1 bg-gray-100 rounded-full px-3 py-1 mb-1">
-              <span className="flex-1 text-xs truncate">{l}</span>
-              <button onClick={() => toggle(l)}><X size={10} className="text-gray-400 hover:text-red-500" /></button>
-            </div>
-          ))}
-          <div className="flex gap-1.5 mt-3">
-            <input value={custom} onChange={e => setCustom(e.target.value)} onKeyDown={e => e.key === "Enter" && addCustom()} placeholder="Nova etiqueta..." className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
-            <button onClick={addCustom} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-xs hover:bg-indigo-700">+</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Novo Contato ─────────────────────────────────────────────────────────────
+// ── Novo Contato ──────────────────────────────────────────────────────────────
 
 function NewContactModal({ phone, name, onSave, onClose }: any) {
-  const [form, setForm] = useState({ name: name || "", phone: phone || "", role: "APOIADOR" });
+  const [form, setForm]   = useState({ name: name || "", phone: phone || "" });
   const [saving, setSaving] = useState(false);
   const f = (k: string) => (e: any) => setForm(p => ({ ...p, [k]: e.target.value }));
 
@@ -130,9 +62,6 @@ function NewContactModal({ phone, name, onSave, onClose }: any) {
         <form onSubmit={save} className="flex flex-col gap-3">
           <input required value={form.name} onChange={f("name")} placeholder="Nome *" className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           <input required value={form.phone} onChange={f("phone")} placeholder="Telefone *" className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <select value={form.role} onChange={f("role")} className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            {ROLE_ORDER.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-          </select>
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
             <button disabled={saving} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-medium">{saving ? "Salvando..." : "Salvar"}</button>
@@ -143,7 +72,7 @@ function NewContactModal({ phone, name, onSave, onClose }: any) {
   );
 }
 
-// ── Media / Link Modal ────────────────────────────────────────────────────────
+// ── Attach Modal ──────────────────────────────────────────────────────────────
 
 interface SendPayload {
   base64?: string; mimeType?: string; fileName?: string;
@@ -152,13 +81,13 @@ interface SendPayload {
 }
 
 function AttachModal({ onSend, onClose }: { onSend: (p: SendPayload) => void; onClose: () => void }) {
-  const [tab, setTab] = useState<"file" | "link">("file");
-  const [file, setFile] = useState<File | null>(null);
+  const [tab, setTab]     = useState<"file" | "link">("file");
+  const [file, setFile]   = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
-  const [link, setLink] = useState("");
+  const [link, setLink]   = useState("");
   const [linkTitle, setLinkTitle] = useState("");
-  const [linkDesc, setLinkDesc] = useState("");
+  const [linkDesc, setLinkDesc]   = useState("");
   const [loading, setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -197,7 +126,6 @@ function AttachModal({ onSend, onClose }: { onSend: (p: SendPayload) => void; on
           <span className="font-semibold text-gray-900 text-sm">Anexar</span>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400"><X size={15} /></button>
         </div>
-
         <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4">
           {([["file", "Arquivo", Paperclip], ["link", "Link / Preview", Link2]] as const).map(([t, label, Icon]) => (
             <button key={t} onClick={() => setTab(t)} className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-2 rounded-lg font-medium transition-all ${tab === t ? "bg-white shadow text-indigo-700" : "text-gray-500"}`}>
@@ -205,7 +133,6 @@ function AttachModal({ onSend, onClose }: { onSend: (p: SendPayload) => void; on
             </button>
           ))}
         </div>
-
         {tab === "file" ? (
           <div className="flex flex-col gap-3">
             <div onClick={() => fileRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl p-5 flex flex-col items-center gap-2 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
@@ -231,10 +158,8 @@ function AttachModal({ onSend, onClose }: { onSend: (p: SendPayload) => void; on
             <input value={link} onChange={e => setLink(e.target.value)} placeholder="URL *" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             <input value={linkTitle} onChange={e => setLinkTitle(e.target.value)} placeholder="Título (opcional)" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             <input value={linkDesc} onChange={e => setLinkDesc(e.target.value)} placeholder="Descrição (opcional)" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            <p className="text-xs text-gray-400">O WhatsApp irá gerar o preview automaticamente</p>
           </div>
         )}
-
         <div className="flex gap-2 mt-4">
           <button onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2 text-sm text-gray-600">Cancelar</button>
           <button onClick={send} disabled={loading || (tab === "file" ? !file : !link.trim())} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl py-2 text-sm font-medium flex items-center justify-center gap-1.5">
@@ -247,10 +172,10 @@ function AttachModal({ onSend, onClose }: { onSend: (p: SendPayload) => void; on
   );
 }
 
-// ── Bolha de mídia recebida ──────────────────────────────────────────────────
+// ── Bolha de mídia ────────────────────────────────────────────────────────────
 
 function MediaBubble({ messageId, mediaType }: { messageId: string; mediaType: string }) {
-  const [src, setSrc] = useState<string | null>(null);
+  const [src, setSrc]   = useState<string | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
   async function load() {
@@ -274,7 +199,6 @@ function MediaBubble({ messageId, mediaType }: { messageId: string; mediaType: s
     );
     return <img src={src!} className="rounded-xl max-w-full max-h-52 object-contain cursor-pointer" onClick={() => window.open(src!, "_blank")} alt="" />;
   }
-
   if (mediaType === "video") {
     if (state !== "ready") return (
       <button onClick={load} disabled={state === "loading"} className="flex items-center gap-2 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-xl transition-colors w-full justify-center">
@@ -284,7 +208,6 @@ function MediaBubble({ messageId, mediaType }: { messageId: string; mediaType: s
     );
     return <video src={src!} controls className="rounded-xl max-w-full max-h-52" />;
   }
-
   if (mediaType === "audio") {
     if (state !== "ready") return (
       <button onClick={load} disabled={state === "loading"} className="flex items-center gap-2 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-xl transition-colors w-full">
@@ -294,7 +217,6 @@ function MediaBubble({ messageId, mediaType }: { messageId: string; mediaType: s
     );
     return <audio src={src!} controls className="w-full max-w-xs" />;
   }
-
   if (mediaType === "document") {
     if (state !== "ready") return (
       <button onClick={load} disabled={state === "loading"} className="flex items-center gap-2 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-xl transition-colors w-full">
@@ -304,40 +226,51 @@ function MediaBubble({ messageId, mediaType }: { messageId: string; mediaType: s
     );
     return <a href={src!} download className="flex items-center gap-2 text-xs text-indigo-600 hover:underline"><FileText size={14} /> Baixar arquivo</a>;
   }
-
   return null;
 }
 
-// ── Página ───────────────────────────────────────────────────────────────────
+// ── Página ────────────────────────────────────────────────────────────────────
 
 export default function ConversasPage() {
   const [conversations, setConversations] = useState<any[]>([]);
-  const [selected, setSelected] = useState<any | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [text, setText] = useState("");
-  const [search, setSearch] = useState("");
-  const [sending, setSending] = useState(false);
+  const [selected, setSelected]   = useState<any | null>(null);
+  const [messages, setMessages]   = useState<any[]>([]);
+  const [text, setText]           = useState("");
+  const [search, setSearch]       = useState("");
+  const [sending, setSending]     = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [newContact, setNewContact] = useState<any | null>(null);
-  const [attachModal, setAttachModal] = useState(false);
+  const [attachModal, setAttachModal]   = useState(false);
+  const [newConvModal, setNewConvModal] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [labelDefs, setLabelDefs] = useState<LabelDef[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch("/api/labels").then(r => r.json()).then(setLabelDefs);
+  }, []);
 
   const loadConversations = useCallback(async () => {
     try {
-      const r = await fetch("/api/kanban");
-      const cols = await r.json();
-      const all = cols.flatMap((c: any) => c.conversations.map((conv: any) => ({ ...conv, statusName: c.name, statusColor: c.color })));
-      all.sort((a: any, b: any) => new Date(b.lastMessageAt || b.updatedAt).getTime() - new Date(a.lastMessageAt || a.updatedAt).getTime());
-      setConversations(all);
+      if (showArchived) {
+        const r = await fetch("/api/conversations?closed=true");
+        const data = await r.json();
+        setConversations(data);
+      } else {
+        const r = await fetch("/api/kanban");
+        const cols = await r.json();
+        const all = cols.flatMap((c: any) => c.conversations.map((conv: any) => ({ ...conv, statusName: c.name, statusColor: c.color })));
+        all.sort((a: any, b: any) => new Date(b.lastMessageAt || b.updatedAt).getTime() - new Date(a.lastMessageAt || a.updatedAt).getTime());
+        setConversations(all);
+      }
     } catch {}
-  }, []);
+  }, [showArchived]);
 
   const loadMessages = useCallback(async (convId: string) => {
     try {
       const r = await fetch(`/api/conversations/${convId}`);
       const d = await r.json();
       const msgs: any[] = d.messages ?? [];
-      // Deduplicação por ID
       const unique = Array.from(new Map(msgs.map((m: any) => [m.id, m])).values());
       setMessages(unique);
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
@@ -360,11 +293,15 @@ export default function ConversasPage() {
 
   const selectedId = selected?.id;
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId || showArchived) return;
     loadMessages(selectedId);
     const interval = setInterval(() => loadMessages(selectedId), 6000);
     return () => clearInterval(interval);
-  }, [selectedId, loadMessages]);
+  }, [selectedId, loadMessages, showArchived]);
+
+  useEffect(() => {
+    if (selectedId && showArchived) loadMessages(selectedId);
+  }, [selectedId]);
 
   useEffect(() => {
     if (selected?.contact) loadPhoto(selected.contact);
@@ -387,12 +324,33 @@ export default function ConversasPage() {
     } finally { setSending(false); }
   }
 
+  async function closeConversation() {
+    if (!selected) return;
+    await fetch(`/api/conversations/${selected.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ close: true }),
+    });
+    toast.success("Conversa fechada");
+    setConversations(prev => prev.filter(c => c.id !== selected.id));
+    setSelected(null);
+    setMessages([]);
+  }
+
+  async function reopenConversation() {
+    if (!selected) return;
+    await fetch(`/api/conversations/${selected.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ close: false }),
+    });
+    toast.success("Conversa reaberta");
+    setConversations(prev => prev.filter(c => c.id !== selected.id));
+    setSelected(null);
+    setMessages([]);
+  }
+
   async function handleAttach(p: SendPayload) {
-    if (p.linkUrl) {
-      await sendMsg({ linkUrl: p.linkUrl, linkTitle: p.linkTitle, linkDescription: p.linkDescription });
-    } else if (p.base64) {
-      await sendMsg({ base64: p.base64, mimeType: p.mimeType, fileName: p.fileName, message: p.caption });
-    }
+    if (p.linkUrl) await sendMsg({ linkUrl: p.linkUrl, linkTitle: p.linkTitle, linkDescription: p.linkDescription });
+    else if (p.base64) await sendMsg({ base64: p.base64, mimeType: p.mimeType, fileName: p.fileName, message: p.caption });
   }
 
   function updateLabels(contactId: string, labels: string[]) {
@@ -412,30 +370,47 @@ export default function ConversasPage() {
       {/* ── Sidebar ── */}
       <aside className="w-72 flex flex-col border-r border-gray-200 bg-white shrink-0">
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-100">
-          <span className="font-semibold text-gray-900">Conversas</span>
-          <button onClick={async () => { setRefreshing(true); await loadConversations(); setRefreshing(false); }} className={`p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 ${refreshing ? "animate-spin" : ""}`}>
-            <RefreshCw size={14} />
-          </button>
+          <span className="font-semibold text-gray-900">
+            {showArchived ? "Arquivadas" : "Conversas"}
+          </span>
+          <div className="flex items-center gap-1">
+            <button onClick={() => { setShowArchived(v => !v); setSelected(null); setMessages([]); }}
+              title={showArchived ? "Ver abertas" : "Ver arquivadas"}
+              className={`p-1.5 rounded-lg transition-colors ${showArchived ? "bg-amber-50 text-amber-600" : "hover:bg-gray-100 text-gray-400"}`}>
+              {showArchived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+            </button>
+            <button onClick={() => setNewConvModal(true)} title="Nova conversa"
+              className="p-1.5 hover:bg-indigo-50 text-indigo-500 rounded-lg transition-colors">
+              <MessageSquarePlus size={14} />
+            </button>
+            <button onClick={async () => { setRefreshing(true); await loadConversations(); setRefreshing(false); }}
+              className={`p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 ${refreshing ? "animate-spin" : ""}`}>
+              <RefreshCw size={14} />
+            </button>
+          </div>
         </div>
+
         <div className="px-3 py-2 border-b border-gray-100">
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar…" className="w-full pl-8 pr-3 py-2 bg-gray-100 rounded-xl text-sm focus:outline-none" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar…"
+              className="w-full pl-8 pr-3 py-2 bg-gray-100 rounded-xl text-sm focus:outline-none" />
           </div>
         </div>
+
         <div className="flex-1 overflow-y-auto">
           {filtered.length === 0 && (
-            <div className="p-6 text-center text-gray-400 text-xs space-y-2">
-              <p className="font-medium text-sm">Nenhuma conversa</p>
-              <p>Configure o webhook na Evolution API:</p>
-              <code className="block bg-gray-100 rounded-lg px-2 py-1 text-indigo-600 break-all">/api/webhook</code>
+            <div className="p-6 text-center text-gray-400 text-xs space-y-1">
+              <p className="font-medium text-sm">{showArchived ? "Nenhuma conversa arquivada" : "Nenhuma conversa"}</p>
+              {!showArchived && <p>Configure o webhook na Evolution API</p>}
             </div>
           )}
           {filtered.map(conv => {
-            const active = selected?.id === conv.id;
+            const active  = selected?.id === conv.id;
             const labels: string[] = conv.contact?.labels ?? [];
             return (
-              <div key={conv.id} onClick={() => setSelected(conv)} className={`flex items-center gap-3 px-3 py-3 cursor-pointer border-b border-gray-50 hover:bg-gray-50 ${active ? "bg-indigo-50 border-l-[3px] border-l-indigo-500" : ""}`}>
+              <div key={conv.id} onClick={() => setSelected(conv)}
+                className={`flex items-center gap-3 px-3 py-3 cursor-pointer border-b border-gray-50 hover:bg-gray-50 ${active ? "bg-indigo-50 border-l-[3px] border-l-indigo-500" : ""}`}>
                 <Avatar contact={conv.contact} size={42} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
@@ -444,10 +419,10 @@ export default function ConversasPage() {
                   </div>
                   <p className="text-xs text-gray-500 truncate mt-0.5">{conv.lastMessageText || "—"}</p>
                   {labels.length > 0 && (
-                    <div className="flex gap-1 mt-1">
+                    <div className="flex gap-1 mt-1 flex-wrap">
                       {labels.slice(0, 2).map(l => {
-                        const cfg = LABEL_COLORS.find(lc => lc.name === l);
-                        return <span key={l} className="text-[10px] px-1.5 py-0.5 rounded-full text-white leading-none" style={{ backgroundColor: cfg?.color ?? "#6b7280" }}>{l}</span>;
+                        const s = getLabelStyle(l, labelDefs);
+                        return <span key={l} className="text-[10px] px-1.5 py-0.5 rounded-full leading-none font-medium" style={{ backgroundColor: s.bgColor, color: s.color }}>{l}</span>;
                       })}
                       {labels.length > 2 && <span className="text-[10px] text-gray-400">+{labels.length - 2}</span>}
                     </div>
@@ -462,7 +437,9 @@ export default function ConversasPage() {
       {/* ── Chat ── */}
       {!selected ? (
         <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-          <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Send size={22} className="text-gray-300" /></div>
+          <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+            <Send size={22} className="text-gray-300" />
+          </div>
           <p className="font-medium text-gray-600">Selecione uma conversa</p>
           <p className="text-sm mt-1">Mensagens do WhatsApp aparecem aqui automaticamente</p>
         </div>
@@ -480,24 +457,49 @@ export default function ConversasPage() {
             </div>
             <div className="flex items-center gap-1 shrink-0">
               {isUnknown && (
-                <button onClick={() => setNewContact(selected.contact)} className="flex items-center gap-1.5 text-xs bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 px-3 py-1.5 rounded-lg font-medium">
+                <button onClick={() => setNewContact(selected.contact)}
+                  className="flex items-center gap-1.5 text-xs bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 px-3 py-1.5 rounded-lg font-medium">
                   <UserPlus size={12} /> Salvar
                 </button>
               )}
-              <LabelManager contact={selected.contact} onUpdate={(labels: string[]) => updateLabels(selected.contactId, labels)} />
+              <LabelManager
+                contactId={selected.contactId}
+                labels={selected.contact?.labels ?? []}
+                onUpdate={(labels: string[]) => updateLabels(selected.contactId, labels)}
+                labelDefs={labelDefs}
+                onDefsChange={setLabelDefs}
+              />
+              {showArchived ? (
+                <button onClick={reopenConversation}
+                  className="flex items-center gap-1.5 text-xs bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 px-3 py-1.5 rounded-lg font-medium">
+                  <ArchiveRestore size={12} /> Reabrir
+                </button>
+              ) : (
+                <button onClick={closeConversation}
+                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100 px-3 py-1.5 rounded-lg transition-colors">
+                  <Archive size={12} /> Fechar
+                </button>
+              )}
             </div>
           </div>
 
           {/* Mensagens */}
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5 bg-[#f0f2f5]">
+            {showArchived && (
+              <div className="flex justify-center mb-3">
+                <span className="text-[11px] bg-amber-50 text-amber-600 border border-amber-100 rounded-full px-3 py-1">
+                  Conversa arquivada
+                </span>
+              </div>
+            )}
             {messages.length === 0 && (
               <div className="flex items-center justify-center h-full text-gray-400 text-sm">Nenhuma mensagem</div>
             )}
             {messages.map((msg, i) => {
-              const prev = messages[i - 1];
-              const day = format(new Date(msg.sentAt), "dd/MM/yyyy");
+              const prev    = messages[i - 1];
+              const day     = format(new Date(msg.sentAt), "dd/MM/yyyy");
               const prevDay = prev ? format(new Date(prev.sentAt), "dd/MM/yyyy") : null;
-              const isOut = msg.direction === "OUT";
+              const isOut   = msg.direction === "OUT";
               return (
                 <div key={msg.id}>
                   {day !== prevDay && (
@@ -523,28 +525,28 @@ export default function ConversasPage() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
-          <div className="flex items-center gap-2 px-4 py-3 bg-white border-t border-gray-100">
-            <button onClick={() => setAttachModal(true)} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 transition-colors shrink-0">
-              <Paperclip size={18} />
-            </button>
-            <input
-              value={text}
-              onChange={e => setText(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && text.trim()) { e.preventDefault(); sendMsg({ message: text }); } }}
-              placeholder="Mensagem"
-              className="flex-1 bg-gray-100 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400 transition-all"
-            />
-            <button onClick={() => { if (text.trim()) sendMsg({ message: text }); }} disabled={sending || !text.trim()}
-              className="w-9 h-9 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-full flex items-center justify-center transition-colors shrink-0">
-              <Send size={15} />
-            </button>
-          </div>
+          {/* Input — desabilitado em arquivadas */}
+          {!showArchived && (
+            <div className="flex items-center gap-2 px-4 py-3 bg-white border-t border-gray-100">
+              <button onClick={() => setAttachModal(true)} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 transition-colors shrink-0">
+                <Paperclip size={18} />
+              </button>
+              <input value={text} onChange={e => setText(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && text.trim()) { e.preventDefault(); sendMsg({ message: text }); } }}
+                placeholder="Mensagem"
+                className="flex-1 bg-gray-100 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400 transition-all" />
+              <button onClick={() => { if (text.trim()) sendMsg({ message: text }); }} disabled={sending || !text.trim()}
+                className="w-9 h-9 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-full flex items-center justify-center transition-colors shrink-0">
+                <Send size={15} />
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {attachModal && <AttachModal onSend={p => { handleAttach(p); }} onClose={() => setAttachModal(false)} />}
       {newContact && <NewContactModal phone={newContact.phone} name={newContact.name} onSave={() => { setNewContact(null); loadConversations(); }} onClose={() => setNewContact(null)} />}
+      {newConvModal && <NewConversationModal onClose={() => setNewConvModal(false)} onCreated={conv => { loadConversations(); setSelected(conv); }} />}
     </div>
   );
 }

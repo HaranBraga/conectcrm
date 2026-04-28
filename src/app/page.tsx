@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
-import { Plus, RefreshCw, Settings } from "lucide-react";
+import { Plus, RefreshCw, Settings, MessageSquarePlus } from "lucide-react";
 import Link from "next/link";
 import { Modal } from "@/components/ui/Modal";
+import { NewConversationModal } from "@/components/ui/NewConversationModal";
 import { type PersonRole } from "@/components/ui/RoleBadge";
 import toast from "react-hot-toast";
 
@@ -41,11 +42,12 @@ function NewContactQuick({ onSave, onClose, roles }: { onSave: () => void; onClo
 }
 
 export default function KanbanPage() {
-  const [columns, setColumns] = useState<any[]>([]);
-  const [roles, setRoles] = useState<PersonRole[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [modal, setModal] = useState(false);
+  const [columns, setColumns]   = useState<any[]>([]);
+  const [roles, setRoles]       = useState<PersonRole[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(false);
+  const [modal, setModal]       = useState(false);
+  const [newConvModal, setNewConvModal] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -91,6 +93,9 @@ export default function KanbanPage() {
           <p className="text-sm text-gray-500">{total} contatos • {columns.length} colunas</p>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={() => setNewConvModal(true)} className="flex items-center gap-2 border border-gray-200 hover:bg-gray-50 text-gray-600 px-3 py-2 rounded-lg text-sm transition-colors">
+            <MessageSquarePlus size={15} /> Nova Conversa
+          </button>
           <button onClick={() => setModal(true)} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
             <Plus size={16} /> Novo Contato
           </button>
@@ -117,6 +122,13 @@ export default function KanbanPage() {
       <Modal open={modal} onClose={() => setModal(false)} title="Novo Contato" size="sm">
         <NewContactQuick roles={roles} onSave={() => { setModal(false); load(); }} onClose={() => setModal(false)} />
       </Modal>
+
+      {newConvModal && (
+        <NewConversationModal
+          onClose={() => setNewConvModal(false)}
+          onCreated={() => load()}
+        />
+      )}
     </div>
   );
 }

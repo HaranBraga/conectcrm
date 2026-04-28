@@ -43,9 +43,31 @@ async function seedKanban() {
   }
 }
 
+const DEFAULT_LABELS = [
+  { name: "Interessado", color: "#10b981", bgColor: "#d1fae5" },
+  { name: "Sem retorno", color: "#f59e0b", bgColor: "#fef3c7" },
+  { name: "Frio",        color: "#3b82f6", bgColor: "#dbeafe" },
+  { name: "VIP",         color: "#8b5cf6", bgColor: "#ede9fe" },
+  { name: "Urgente",     color: "#ef4444", bgColor: "#fee2e2" },
+  { name: "Reunião",     color: "#ec4899", bgColor: "#fce7f3" },
+];
+
+async function seedLabels() {
+  const count = await prisma.label.count();
+  if (count === 0) {
+    for (const label of DEFAULT_LABELS) {
+      await prisma.label.upsert({ where: { name: label.name }, update: {}, create: label });
+    }
+    console.log("✅ Etiquetas: 6 etiquetas padrão criadas");
+  } else {
+    console.log(`✅ Etiquetas: ${count} etiquetas já existem`);
+  }
+}
+
 async function main() {
   await seedRoles();
   await seedKanban();
+  await seedLabels();
 }
 
 main()

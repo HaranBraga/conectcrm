@@ -99,6 +99,10 @@ export async function POST(req: NextRequest) {
 
     // Busca ou cria conversa
     let conversation = await prisma.conversation.findUnique({ where: { contactId: contact.id } });
+    // Reabre conversa fechada quando nova mensagem chega
+    if (conversation?.closedAt && !fromMe) {
+      conversation = await prisma.conversation.update({ where: { id: conversation.id }, data: { closedAt: null } });
+    }
     if (!conversation) {
       const defaultStatus = await prisma.kanbanStatus.findFirst({ orderBy: { position: "asc" } });
       if (defaultStatus) {

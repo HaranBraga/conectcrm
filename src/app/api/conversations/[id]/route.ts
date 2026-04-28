@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendText, sendMedia, sendMediaBase64, sendLink } from "@/lib/evolution";
 
+export const dynamic = "force-dynamic";
+
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const { close } = await req.json();
+  const conversation = await prisma.conversation.update({
+    where: { id: params.id },
+    data: { closedAt: close ? new Date() : null },
+  });
+  return NextResponse.json(conversation);
+}
+
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const conversation = await prisma.conversation.findUnique({
     where: { id: params.id },
