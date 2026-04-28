@@ -121,7 +121,7 @@ function ContactForm({ initial, onSave, onClose, contacts, roles }: {
       <div>
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Endereço</p>
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Rua</label>
             <input value={form.rua} onChange={f("rua")} className={inp} />
           </div>
@@ -135,7 +135,11 @@ function ContactForm({ initial, onSave, onClose, contacts, roles }: {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Zona</label>
-            <input value={form.zona} onChange={f("zona")} placeholder="Norte, Sul, Centro..." className={inp} />
+            <select value={form.zona} onChange={f("zona")} className={inp}>
+              <option value="">— Selecionar —</option>
+              <option value="Urbano">Urbano</option>
+              <option value="Rural">Rural</option>
+            </select>
           </div>
         </div>
       </div>
