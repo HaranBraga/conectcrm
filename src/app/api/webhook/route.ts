@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+// Normaliza número BR: 55 + DDD(2) + 8 dígitos → adiciona o 9º dígito
+function normalizePhone(digits: string): string {
+  if (digits.startsWith("55") && digits.length === 13) {
+    return `${digits.slice(0, 4)}9${digits.slice(4)}`;
+  }
+  return digits;
+}
+
+// Retorna o formato alternativo (com ↔ sem 9º dígito) para fallback de busca
+function alternatePhone(phone: string): string | null {
+  if (phone.startsWith("55") && phone.length === 14 && phone[4] === "9") {
+    return `${phone.slice(0, 4)}${phone.slice(5)}`;
+  }
+  if (phone.startsWith("55") && phone.length === 13) {
+    return `${phone.slice(0, 4)}9${phone.slice(4)}`;
+  }
+  return null;
+}
+
 function extractText(data: any): string {
   const msg = data?.message;
   if (!msg) return "";
@@ -42,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
 
     const fromMe: boolean = data?.key?.fromMe ?? false;
-    const phone = remoteJid.replace("@s.whatsapp.net", "").replace(/\D/g, "");
+    const phone = normalizePhone(remoteJid.replace("@s.whatsapp.net", "").replace(/\D/g, ""));
     const pushName: string = data?.pushName ?? "";
     const text = extractText(data);
     const msgId: string = data?.key?.id ?? "";
@@ -52,8 +71,12 @@ export async function POST(req: NextRequest) {
 
     if (!text) return NextResponse.json({ ok: true });
 
-    // Busca ou cria contato
+    // Busca ou cria contato (tenta formato alternativo 9º dígito se não encontrar)
     let contact = await prisma.contact.findUnique({ where: { phone } });
+    if (!contact) {
+      const alt = alternatePhone(phone);
+      if (alt) contact = await prisma.contact.findUnique({ where: { phone: alt } });
+    }
     if (!contact) {
       const defaultStatus = await prisma.kanbanStatus.findFirst({ orderBy: { position: "asc" } });
       const defaultRole = await prisma.personRole.findFirst({ orderBy: { level: "desc" } });
