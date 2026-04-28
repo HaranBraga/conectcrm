@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const roleInclude = { select: { id: true, key: true, label: true, color: true, bgColor: true, level: true } };
+const roleSelect = { select: { id: true, key: true, label: true, color: true, bgColor: true, level: true } };
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const contact = await prisma.contact.findUnique({
     where: { id: params.id },
     include: {
-      role: roleInclude,
-      parent: { select: { id: true, name: true, role: roleInclude } },
-      children: { select: { id: true, name: true, phone: true, role: roleInclude } },
+      role: roleSelect,
+      parent: { select: { id: true, name: true, role: roleSelect } },
+      children: { select: { id: true, name: true, phone: true, role: roleSelect } },
       conversations: { include: { status: true, messages: { orderBy: { sentAt: "desc" }, take: 10 } } },
     },
   });
@@ -19,21 +19,29 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  const { name, phone, email, roleId, parentId, notes, lastContactAt, lastMessage } = body;
+  const { name, phone, email, roleId, parentId, notes, lastContactAt, lastMessage, dataNascimento, genero, rua, bairro, cidade, zona } = body;
 
   const contact = await prisma.contact.update({
     where: { id: params.id },
     data: {
-      ...(name && { name }),
+      ...(name  && { name }),
       ...(phone && { phone }),
-      ...(email !== undefined && { email }),
-      ...(roleId && { roleId }),
-      ...(parentId !== undefined && { parentId }),
-      ...(notes !== undefined && { notes }),
+      ...(email     !== undefined && { email }),
+      ...(roleId    && { roleId }),
+      ...(parentId  !== undefined && { parentId }),
+      ...(notes     !== undefined && { notes }),
       ...(lastContactAt !== undefined && { lastContactAt: lastContactAt ? new Date(lastContactAt) : null }),
-      ...(lastMessage !== undefined && { lastMessage }),
+      ...(lastMessage   !== undefined && { lastMessage }),
+      ...(genero    !== undefined && { genero }),
+      ...(rua       !== undefined && { rua }),
+      ...(bairro    !== undefined && { bairro }),
+      ...(cidade    !== undefined && { cidade }),
+      ...(zona      !== undefined && { zona }),
+      ...(dataNascimento !== undefined && {
+        dataNascimento: dataNascimento ? new Date(dataNascimento) : null,
+      }),
     },
-    include: { role: roleInclude },
+    include: { role: roleSelect },
   });
   return NextResponse.json(contact);
 }
