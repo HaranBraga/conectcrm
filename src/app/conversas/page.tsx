@@ -400,9 +400,8 @@ export default function ConversasPage() {
 
         <div className="flex-1 overflow-y-auto">
           {filtered.length === 0 && (
-            <div className="p-6 text-center text-gray-400 text-xs space-y-1">
+            <div className="p-6 text-center text-gray-400 text-xs">
               <p className="font-medium text-sm">{showArchived ? "Nenhuma conversa arquivada" : "Nenhuma conversa"}</p>
-              {!showArchived && <p>Configure o webhook na Evolution API</p>}
             </div>
           )}
           {filtered.map(conv => {

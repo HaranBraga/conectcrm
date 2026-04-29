@@ -1,19 +1,9 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Tag, X, Plus } from "lucide-react";
+import { Tag, X } from "lucide-react";
 
 export interface LabelDef { id: string; name: string; color: string; bgColor: string; }
 
-const PRESET_COLORS = [
-  { color: "#10b981", bgColor: "#d1fae5" },
-  { color: "#f59e0b", bgColor: "#fef3c7" },
-  { color: "#3b82f6", bgColor: "#dbeafe" },
-  { color: "#8b5cf6", bgColor: "#ede9fe" },
-  { color: "#ef4444", bgColor: "#fee2e2" },
-  { color: "#ec4899", bgColor: "#fce7f3" },
-  { color: "#6366f1", bgColor: "#eef2ff" },
-  { color: "#14b8a6", bgColor: "#ccfbf1" },
-];
 
 export function getLabelStyle(name: string, defs: LabelDef[]) {
   const def = defs.find(d => d.name === name);
@@ -31,9 +21,6 @@ interface Props {
 export function LabelManager({ contactId, labels, onUpdate, labelDefs, onDefsChange }: Props) {
   const [open, setOpen]       = useState(false);
   const [defs, setDefs]       = useState<LabelDef[]>(labelDefs ?? []);
-  const [newName, setNewName] = useState("");
-  const [colorIdx, setColorIdx] = useState(0);
-  const [creating, setCreating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -137,26 +124,9 @@ export function LabelManager({ contactId, labels, onUpdate, labelDefs, onDefsCha
             ))}
           </div>
 
-          <div className="border-t border-gray-100 pt-3">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Nova etiqueta</p>
-            <div className="flex gap-1 mb-2">
-              {PRESET_COLORS.map((c, i) => (
-                <button key={i} onClick={() => setColorIdx(i)}
-                  className="w-5 h-5 rounded-full border-2 transition-all"
-                  style={{ backgroundColor: c.color, borderColor: i === colorIdx ? "#111" : "transparent" }} />
-              ))}
-            </div>
-            <div className="flex gap-1.5">
-              <input value={newName} onChange={e => setNewName(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && createLabel()}
-                placeholder="Nome da etiqueta..."
-                className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
-              <button onClick={createLabel} disabled={creating || !newName.trim()}
-                className="px-2.5 py-1 bg-indigo-600 disabled:opacity-40 text-white rounded-lg text-xs hover:bg-indigo-700 flex items-center">
-                <Plus size={12} />
-              </button>
-            </div>
-          </div>
+          {defs.length === 0 && orphans.length === 0 && (
+            <p className="text-xs text-gray-400 italic text-center py-2">Nenhuma etiqueta criada.<br />Gerencie em Configurações.</p>
+          )}
         </div>
       )}
     </div>

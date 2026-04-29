@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, Search, Clock, Phone, ChevronRight, Trash2, Edit2 } from "lucide-react";
+import { Plus, Search, Clock, Phone, ChevronRight, Edit2 } from "lucide-react";
 import { RoleBadge, type PersonRole } from "@/components/ui/RoleBadge";
 import { Modal } from "@/components/ui/Modal";
 import { formatDistanceToNow } from "date-fns";
@@ -198,12 +198,6 @@ export default function ContatosPage() {
     load(1, search, v);
   }
 
-  async function del(id: string, name: string) {
-    if (!confirm(`Deletar "${name}"?`)) return;
-    await fetch(`/api/contacts/${id}`, { method: "DELETE" });
-    toast.success("Contato removido");
-    load(1);
-  }
 
   const grouped = roles.reduce<Record<string, Contact[]>>((acc, role) => {
     acc[role.id] = contacts.filter((c) => c.roleId === role.id);
@@ -270,7 +264,6 @@ export default function ContatosPage() {
                     )}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => { setEditing(c); setModal("edit"); }} className="p-1.5 hover:bg-gray-200 rounded text-gray-500"><Edit2 size={14} /></button>
-                      <button onClick={() => del(c.id, c.name)} className="p-1.5 hover:bg-red-100 rounded text-red-400"><Trash2 size={14} /></button>
                     </div>
                   </div>
                 ))}
