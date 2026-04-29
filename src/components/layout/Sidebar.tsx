@@ -1,11 +1,12 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Send, Settings, Layers, Zap, MessageSquare, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Users, Send, Settings, Layers, Zap, MessageSquare, ClipboardList, CalendarDays } from "lucide-react";
 
 const nav = [
   { href: "/conversas",     label: "Conversas",    icon: MessageSquare },
   { href: "/",              label: "Kanban",        icon: LayoutDashboard },
+  { href: "/agenda",        label: "Agenda",        icon: CalendarDays },
   { href: "/demandas",      label: "Demandas",      icon: ClipboardList },
   { href: "/contatos",      label: "Contatos",      icon: Users },
   { href: "/grupos",        label: "Grupos",        icon: Layers },

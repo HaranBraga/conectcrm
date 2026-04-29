@@ -65,7 +65,9 @@ model Contact {
 
   conversations Conversation[]
   groupMembers  GroupMember[]
-  demandas      Demanda[]      @relation("ContactDemandas")
+  demandas           Demanda[]        @relation("ContactDemandas")
+  agendaSolicitante  AgendaEvento[]   @relation("AgendaSolicitante")
+  agendaAnfitrioes   AgendaAnfitriao[] @relation("ContactAnfitrioes")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -181,6 +183,8 @@ model Demanda {
   conversaId    String?
   conversa      Conversation? @relation(fields: [conversaId], references: [id])
 
+  agendas AgendaEvento[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -188,6 +192,47 @@ model Demanda {
   @@index([solicitanteId])
   @@index([lembrete])
   @@index([arquivadaEm])
+}
+
+model AgendaEvento {
+  id                String  @id @default(cuid())
+  titulo            String
+  assunto           String?
+  tipo              String  @default("AGENDA")    // AGENDA | REUNIAO
+  status            String  @default("PENDENTE")  // PENDENTE | CONFIRMADA | REALIZADA | CANCELADA
+  inicio            DateTime
+  duracao           Int?    // minutos
+  local             String?
+  bairro            String?
+  zona              String?
+  quantidadePessoas Int?
+  oQuePrecisa       String?
+  notes             String?
+
+  solicitanteId   String?
+  solicitante     Contact? @relation("AgendaSolicitante", fields: [solicitanteId], references: [id])
+  solicitanteNome String?
+  solicitanteTel  String?
+
+  demandaId String?
+  demanda   Demanda? @relation(fields: [demandaId], references: [id])
+
+  anfitrioes AgendaAnfitriao[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([inicio])
+  @@index([tipo])
+  @@index([status])
+}
+
+model AgendaAnfitriao {
+  id        String       @id @default(cuid())
+  eventoId  String
+  evento    AgendaEvento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  contactId String
+  contact   Contact      @relation("ContactAnfitrioes", fields: [contactId], references: [id])
 }
 
 model DispatchResult {
