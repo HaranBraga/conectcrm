@@ -259,6 +259,17 @@ export default function ContatosPage() {
                         )}
                       </div>
                     </div>
+                    {/* Kanban status */}
+                    {(() => {
+                      const conv = (c as any).conversations?.[0];
+                      if (!conv || conv.closedAt) return null;
+                      return (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full text-white shrink-0"
+                          style={{ backgroundColor: conv.status?.color ?? "#6366f1" }}>
+                          {conv.status?.name ?? "—"}
+                        </span>
+                      );
+                    })()}
                     {c._count && c._count.children > 0 && (
                       <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{c._count.children} na rede</span>
                     )}

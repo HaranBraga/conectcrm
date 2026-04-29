@@ -34,6 +34,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       ...(prazo         !== undefined && { prazo: prazo ? new Date(prazo) : null }),
       ...(fechadaEm     !== undefined && { fechadaEm: fechadaEm ? new Date(fechadaEm) : null }),
       ...(body.arquivadaEm !== undefined && { arquivadaEm: body.arquivadaEm ? new Date(body.arquivadaEm) : null }),
+      // Ao arquivar, registra fechadaEm se ainda não tiver (para relatórios)
+      ...(body.arquivadaEm && !body.fechadaEm && { fechadaEm: new Date(body.arquivadaEm) }),
     },
     include,
   });

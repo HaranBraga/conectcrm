@@ -16,8 +16,10 @@ export async function GET(req: NextRequest) {
   const search    = searchParams.get("search")    ?? "";
   const lembrete  = searchParams.get("lembrete") === "hoje";
 
-  const arquivadas = searchParams.get("arquivadas") === "true";
+  const arquivadas   = searchParams.get("arquivadas")   === "true";
+  const hasLembrete  = searchParams.get("hasLembrete")  === "true";
   const where: any = { arquivadaEm: arquivadas ? { not: null } : null };
+  if (hasLembrete) where.lembrete = { not: null };
   if (status)    where.status    = status;
   if (segmento)  where.segmento  = segmento;
   if (prioridade) where.prioridade = prioridade;

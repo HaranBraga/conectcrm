@@ -24,6 +24,13 @@ export async function GET(req: NextRequest) {
         role: roleSelect,
         parent: { select: { id: true, name: true, role: roleSelect } },
         _count: { select: { children: true } },
+        conversations: {
+          take: 1,
+          select: {
+            id: true, closedAt: true,
+            status: { select: { id: true, name: true, color: true } },
+          },
+        },
       },
       orderBy: [{ role: { level: "asc" } }, { name: "asc" }],
       skip: (page - 1) * limit,
