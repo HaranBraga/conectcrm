@@ -3,8 +3,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search, Send, X, UserPlus, RefreshCw,
   CheckCheck, Paperclip, Link2, FileText, Mic,
-  MessageSquarePlus, Archive, ArchiveRestore,
+  MessageSquarePlus, Archive, ArchiveRestore, ClipboardList,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { LabelManager, getLabelStyle, type LabelDef } from "@/components/ui/LabelManager";
 import { NewConversationModal } from "@/components/ui/NewConversationModal";
@@ -232,6 +233,7 @@ function MediaBubble({ messageId, mediaType }: { messageId: string; mediaType: s
 // ── Página ────────────────────────────────────────────────────────────────────
 
 export default function ConversasPage() {
+  const router = useRouter();
   const [conversations, setConversations] = useState<any[]>([]);
   const [selected, setSelected]   = useState<any | null>(null);
   const [messages, setMessages]   = useState<any[]>([]);
@@ -468,6 +470,12 @@ export default function ConversasPage() {
                 labelDefs={labelDefs}
                 onDefsChange={setLabelDefs}
               />
+              <button
+                onClick={() => router.push(`/demandas?contactId=${selected.contactId}&conversaId=${selected.id}`)}
+                title="Criar demanda a partir desta conversa"
+                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 border border-transparent hover:border-indigo-100 px-3 py-1.5 rounded-lg transition-colors">
+                <ClipboardList size={12} /> Demanda
+              </button>
               {showArchived ? (
                 <button onClick={reopenConversation}
                   className="flex items-center gap-1.5 text-xs bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 px-3 py-1.5 rounded-lg font-medium">

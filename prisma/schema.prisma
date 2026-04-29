@@ -65,6 +65,7 @@ model Contact {
 
   conversations Conversation[]
   groupMembers  GroupMember[]
+  demandas      Demanda[]      @relation("ContactDemandas")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -105,6 +106,7 @@ model Conversation {
   lastMessageText String?
   closedAt        DateTime?
   messages        Message[]
+  demandas        Demanda[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -158,6 +160,47 @@ model Dispatch {
 model AppConfig {
   key   String @id
   value String
+}
+
+enum DemandaStatus {
+  ANALISAR
+  EM_ANDAMENTO
+  PENDENTE
+  ATENDIDA
+  NAO_ATENDIDA
+}
+
+enum DemandaPrioridade {
+  URGENTE
+  IMPORTANTE
+  MEDIA
+  NORMAL
+}
+
+model Demanda {
+  id            String            @id @default(cuid())
+  titulo        String
+  descricao     String?
+  status        DemandaStatus     @default(ANALISAR)
+  segmento      String?
+  prioridade    DemandaPrioridade @default(NORMAL)
+  valor         Float?
+  obs           String?
+  lembrete      DateTime?
+  prazo         DateTime?
+  fechadaEm     DateTime?
+
+  solicitanteId String
+  solicitante   Contact      @relation("ContactDemandas", fields: [solicitanteId], references: [id])
+  conversaId    String?
+  conversa      Conversation? @relation(fields: [conversaId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([solicitanteId])
+  @@index([lembrete])
 }
 
 model DispatchResult {

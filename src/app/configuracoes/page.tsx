@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Edit2, GripVertical, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Edit2, GripVertical } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { type PersonRole } from "@/components/ui/RoleBadge";
 import toast from "react-hot-toast";
@@ -60,8 +60,7 @@ function RoleForm({ initial, onSave, onClose }: any) {
     e.preventDefault(); setSaving(true);
     try {
       const r = await fetch(`/api/roles/${initial.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ label, color, bgColor }),
       });
       if (!r.ok) { const d = await r.json(); toast.error(d.error); return; }
@@ -85,7 +84,56 @@ function RoleForm({ initial, onSave, onClose }: any) {
       </div>
       <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
         <span className="text-sm text-gray-500">Prévia:</span>
-        <span className="role-badge text-xs font-semibold px-2 py-0.5 rounded-full" style={{ color, backgroundColor: bgColor }}>{label || "Cargo"}</span>
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ color, backgroundColor: bgColor }}>{label || "Cargo"}</span>
+      </div>
+      <div className="flex justify-end gap-3 pt-2">
+        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+        <button disabled={saving} className="px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 rounded-lg font-medium">{saving ? "Salvando..." : "Salvar"}</button>
+      </div>
+    </form>
+  );
+}
+
+function LabelForm({ initial, onSave, onClose }: any) {
+  const [name, setName]       = useState(initial?.name    ?? "");
+  const [color, setColor]     = useState(initial?.color   ?? "#6366f1");
+  const [bgColor, setBgColor] = useState(initial?.bgColor ?? "#eef2ff");
+  const [saving, setSaving]   = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); setSaving(true);
+    try {
+      const method = initial?.id ? "PUT" : "POST";
+      const url    = initial?.id ? `/api/labels/${initial.id}` : "/api/labels";
+      const r = await fetch(url, {
+        method, headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color, bgColor }),
+      });
+      if (!r.ok) { const d = await r.json(); toast.error(d.error ?? "Erro"); return; }
+      toast.success("Etiqueta salva!"); onSave();
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+        <input required value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Interessado"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Cor do texto</label>
+        <ColorPicker value={color} onChange={setColor} />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Cor de fundo</label>
+        <ColorPicker value={bgColor} onChange={setBgColor} />
+      </div>
+      <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+        <span className="text-sm text-gray-500">Prévia:</span>
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ color, backgroundColor: bgColor }}>
+          {name || "Etiqueta"}
+        </span>
       </div>
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
@@ -96,13 +144,13 @@ function RoleForm({ initial, onSave, onClose }: any) {
 }
 
 export default function ConfiguracoesPage() {
-  const [statuses, setStatuses] = useState<any[]>([]);
-  const [roles, setRoles] = useState<PersonRole[]>([]);
-  const [modal, setModal] = useState<"newStatus" | "editStatus" | "editRole" | null>(null);
+  const [statuses, setStatuses]     = useState<any[]>([]);
+  const [roles, setRoles]           = useState<PersonRole[]>([]);
+  const [labels, setLabels]         = useState<any[]>([]);
+  const [modal, setModal]           = useState<"newStatus" | "editStatus" | "editRole" | "newLabel" | "editLabel" | null>(null);
   const [editingStatus, setEditingStatus] = useState<any | null>(null);
-  const [editingRole, setEditingRole] = useState<PersonRole | null>(null);
-  const [apiStatus, setApiStatus] = useState<"unknown" | "ok" | "error">("unknown");
-  const [checking, setChecking] = useState(false);
+  const [editingRole, setEditingRole]     = useState<PersonRole | null>(null);
+  const [editingLabel, setEditingLabel]   = useState<any | null>(null);
 
   const loadStatuses = useCallback(async () => {
     const r = await fetch("/api/kanban");
@@ -114,16 +162,12 @@ export default function ConfiguracoesPage() {
     setRoles(await r.json());
   }, []);
 
-  useEffect(() => { loadStatuses(); loadRoles(); }, [loadStatuses, loadRoles]);
+  const loadLabels = useCallback(async () => {
+    const r = await fetch("/api/labels");
+    setLabels(await r.json());
+  }, []);
 
-  async function checkApi() {
-    setChecking(true);
-    try {
-      const r = await fetch("/api/seed", { method: "POST" });
-      if (r.ok) setApiStatus("ok"); else setApiStatus("error");
-    } catch { setApiStatus("error"); }
-    finally { setChecking(false); }
-  }
+  useEffect(() => { loadStatuses(); loadRoles(); loadLabels(); }, [loadStatuses, loadRoles, loadLabels]);
 
   async function initSeed() {
     const r = await fetch("/api/seed", { method: "POST" });
@@ -138,16 +182,21 @@ export default function ConfiguracoesPage() {
     toast.success(`"${name}" removido`); loadStatuses();
   }
 
+  async function delLabel(id: string, name: string) {
+    await fetch(`/api/labels/${id}`, { method: "DELETE" });
+    toast.success(`"${name}" removida`); loadLabels();
+  }
+
   return (
     <div className="h-screen flex flex-col">
       <header className="px-6 py-4 bg-white border-b border-gray-200">
         <h1 className="text-xl font-bold text-gray-900">Configurações</h1>
-        <p className="text-sm text-gray-500">Kanban, Cargos e Evolution API</p>
+        <p className="text-sm text-gray-500">Kanban, Cargos e Etiquetas</p>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
 
-        {/* Cargos / Hierarquia */}
+        {/* Cargos */}
         <section>
           <div className="mb-4">
             <h2 className="font-semibold text-gray-900">Cargos e Hierarquia</h2>
@@ -157,10 +206,7 @@ export default function ConfiguracoesPage() {
             {roles.map((role) => (
               <div key={role.id} className="flex items-center gap-4 px-4 py-3 group">
                 <span className="text-xs text-gray-400 w-5 text-center">{role.level + 1}</span>
-                <span
-                  className="role-badge text-xs font-semibold px-2 py-0.5 rounded-full"
-                  style={{ color: role.color, backgroundColor: role.bgColor }}
-                >
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ color: role.color, backgroundColor: role.bgColor }}>
                   {role.label}
                 </span>
                 <span className="flex-1 text-xs text-gray-400 font-mono">{role.key}</span>
@@ -172,7 +218,7 @@ export default function ConfiguracoesPage() {
           </div>
         </section>
 
-        {/* Kanban Columns */}
+        {/* Kanban */}
         <section>
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -207,31 +253,42 @@ export default function ConfiguracoesPage() {
           </div>
         </section>
 
-        {/* Evolution API Info */}
+        {/* Etiquetas */}
         <section>
-          <h2 className="font-semibold text-gray-900 mb-1">Evolution API</h2>
-          <p className="text-sm text-gray-500 mb-4">Configure as variáveis no arquivo <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">.env</code> do projeto</p>
-          <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 space-y-3">
-            {[
-              { key: "EVOLUTION_API_URL", desc: "URL da sua instância Evolution API" },
-              { key: "EVOLUTION_API_KEY", desc: "API Key (global ou de instância)" },
-              { key: "EVOLUTION_INSTANCE", desc: "Nome da instância WhatsApp" },
-              { key: "DATABASE_URL", desc: "Connection string do PostgreSQL" },
-            ].map(({ key, desc }) => (
-              <div key={key} className="flex items-start gap-3">
-                <code className="text-xs font-mono bg-white border border-gray-200 rounded px-2 py-1 text-brand-700 shrink-0">{key}</code>
-                <p className="text-sm text-gray-600">{desc}</p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-semibold text-gray-900">Etiquetas</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Gerencie as etiquetas usadas nas conversas e contatos</p>
+            </div>
+            <button onClick={() => { setEditingLabel(null); setModal("newLabel"); }}
+              className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+              <Plus size={15} /> Nova etiqueta
+            </button>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+            {labels.length === 0 && (
+              <div className="py-10 text-center text-gray-400 text-sm">Nenhuma etiqueta criada.</div>
+            )}
+            {labels.map((l) => (
+              <div key={l.id} className="flex items-center gap-4 px-4 py-3 group">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full shrink-0" style={{ color: l.color, backgroundColor: l.bgColor }}>
+                  {l.name}
+                </span>
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <span className="font-mono">{l.color}</span>
+                  <span>·</span>
+                  <span className="font-mono">{l.bgColor}</span>
+                </div>
+                <div className="flex-1" />
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => { setEditingLabel(l); setModal("editLabel"); }} className="p-1.5 hover:bg-gray-100 rounded text-gray-500"><Edit2 size={14} /></button>
+                  <button onClick={() => delLabel(l.id, l.name)} className="p-1.5 hover:bg-red-100 rounded text-red-400"><Trash2 size={14} /></button>
+                </div>
               </div>
             ))}
           </div>
-          <div className="mt-3 flex items-center gap-3">
-            <button onClick={checkApi} disabled={checking} className="flex items-center gap-2 border border-gray-200 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm text-gray-600 transition-colors">
-              <RefreshCw size={14} className={checking ? "animate-spin" : ""} /> Testar conexão com DB
-            </button>
-            {apiStatus === "ok" && <span className="flex items-center gap-1.5 text-green-600 text-sm"><CheckCircle size={15} /> Conectado</span>}
-            {apiStatus === "error" && <span className="flex items-center gap-1.5 text-red-500 text-sm"><AlertCircle size={15} /> Erro na conexão</span>}
-          </div>
         </section>
+
       </div>
 
       <Modal open={modal === "newStatus"} onClose={() => setModal(null)} title="Nova Coluna" size="sm">
@@ -242,6 +299,12 @@ export default function ConfiguracoesPage() {
       </Modal>
       <Modal open={modal === "editRole"} onClose={() => setModal(null)} title="Editar Cargo" size="sm">
         <RoleForm initial={editingRole} onSave={() => { setModal(null); loadRoles(); }} onClose={() => setModal(null)} />
+      </Modal>
+      <Modal open={modal === "newLabel"} onClose={() => setModal(null)} title="Nova Etiqueta" size="sm">
+        <LabelForm onSave={() => { setModal(null); loadLabels(); }} onClose={() => setModal(null)} />
+      </Modal>
+      <Modal open={modal === "editLabel"} onClose={() => setModal(null)} title="Editar Etiqueta" size="sm">
+        <LabelForm initial={editingLabel} onSave={() => { setModal(null); loadLabels(); }} onClose={() => setModal(null)} />
       </Modal>
     </div>
   );
