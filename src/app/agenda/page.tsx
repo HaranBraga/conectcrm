@@ -28,7 +28,7 @@ const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> =
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const START_HOUR = 7;
 const END_HOUR   = 21;
-const HOUR_PX    = 64;
+const HOUR_PX    = 48;
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -425,8 +425,8 @@ function MonthView({ currentDate, events, onDayClick, onEventClick }: {
           const today     = isToday(cell);
           return (
             <div key={i} onClick={() => onDayClick(cell)}
-              className={`border-b border-r border-gray-100 p-1 min-h-[90px] cursor-pointer hover:bg-gray-50 transition-colors ${!inMonth ? "bg-gray-50/60" : ""}`}>
-              <div className={`text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${today ? "bg-brand-600 text-white" : inMonth ? "text-gray-700" : "text-gray-400"}`}>
+              className={`border-b border-r border-gray-100 p-1 min-h-[70px] cursor-pointer hover:bg-gray-50 transition-colors ${!inMonth ? "bg-gray-50/60" : ""}`}>
+              <div className={`text-[11px] font-semibold mb-0.5 w-5 h-5 flex items-center justify-center rounded-full ${today ? "bg-brand-600 text-white" : inMonth ? "text-gray-700" : "text-gray-300"}`}>
                 {cell.getDate()}
               </div>
               <div className="flex flex-col gap-0.5">
@@ -473,9 +473,9 @@ function WeekView({ currentDate, events, onEventClick, onSlotClick }: {
       <div className="grid border-b border-gray-100" style={{ gridTemplateColumns: "56px repeat(7, 1fr)" }}>
         <div />
         {days.map((d, i) => (
-          <div key={i} className="text-center py-2 border-l border-gray-100">
-            <p className="text-xs text-gray-400">{WEEKDAYS[d.getDay()]}</p>
-            <div className={`text-sm font-bold mx-auto w-7 h-7 flex items-center justify-center rounded-full ${isToday(d) ? "bg-brand-600 text-white" : "text-gray-700"}`}>
+          <div key={i} className="text-center py-1.5 border-l border-gray-100">
+            <p className="text-[10px] font-medium text-gray-400 uppercase">{WEEKDAYS[d.getDay()]}</p>
+            <div className={`text-xs font-bold mx-auto w-6 h-6 flex items-center justify-center rounded-full ${isToday(d) ? "bg-brand-600 text-white" : "text-gray-700"}`}>
               {d.getDate()}
             </div>
           </div>
@@ -557,9 +557,9 @@ function AgendaListView({ events, onEventClick }: { events: any[]; onEventClick:
           return (
             <div key={dayKey}>
               <div className="flex items-center gap-3 mb-3">
-                <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center shrink-0 ${isToday(day) ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-700"}`}>
-                  <span className="text-xs leading-none">{format(day, "EEE", { locale: ptBR }).slice(0, 3)}</span>
-                  <span className="text-base font-bold leading-none">{day.getDate()}</span>
+                <div className={`w-8 h-8 rounded-lg flex flex-col items-center justify-center shrink-0 ${isToday(day) ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-700"}`}>
+                  <span className="text-[9px] leading-none uppercase font-semibold">{format(day, "EEE", { locale: ptBR }).slice(0, 3)}</span>
+                  <span className="text-sm font-bold leading-none">{day.getDate()}</span>
                 </div>
                 <p className="text-sm font-semibold text-gray-700">
                   {format(day, "EEEE, dd 'de' MMMM", { locale: ptBR })}
@@ -571,7 +571,7 @@ function AgendaListView({ events, onEventClick }: { events: any[]; onEventClick:
                   const st = STATUS_CFG[ev.status] ?? STATUS_CFG.PENDENTE;
                   return (
                     <div key={ev.id} onClick={() => onEventClick(ev)}
-                      className="flex items-start gap-3 bg-white border border-gray-100 rounded-xl p-3 cursor-pointer hover:shadow-sm transition-shadow">
+                      className="flex items-start gap-3 bg-white border border-gray-100 rounded-xl p-2.5 cursor-pointer hover:shadow-sm transition-shadow">
                       <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: t.color }} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -682,10 +682,22 @@ export default function AgendaPage() {
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shrink-0">
-        <div className="flex items-center gap-3">
-          {/* View selector */}
+      {/* Header — padrão do sistema */}
+      <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 shrink-0">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Agenda</h1>
+          <p className="text-sm text-gray-500">{events.length} evento{events.length !== 1 ? "s" : ""} no período</p>
+        </div>
+        <button onClick={() => openNew()}
+          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          <Plus size={16} /> Nova Agenda
+        </button>
+      </header>
+
+      {/* Toolbar: views + navegação + legenda */}
+      <div className="flex items-center justify-between px-6 py-2 bg-white border-b border-gray-100 shrink-0">
+        <div className="flex items-center gap-2">
+          {/* View */}
           <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
             {VIEWS.map(({ key, label, icon: Icon }) => (
               <button key={key} onClick={() => setView(key as ViewType)}
@@ -694,36 +706,27 @@ export default function AgendaPage() {
               </button>
             ))}
           </div>
-
-          {/* Navigation */}
+          {/* Navegação */}
           <div className="flex items-center gap-1">
             <button onClick={() => setRefDate(navigate(view, refDate, -1))}
-              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><ChevronLeft size={16} /></button>
+              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><ChevronLeft size={15} /></button>
             <button onClick={() => setRefDate(new Date())}
-              className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 font-medium">Hoje</button>
+              className="text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 font-medium">Hoje</button>
             <button onClick={() => setRefDate(navigate(view, refDate, 1))}
-              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><ChevronRight size={16} /></button>
+              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><ChevronRight size={15} /></button>
           </div>
-
-          <h2 className="text-base font-semibold text-gray-900 capitalize">{dateLabel}</h2>
+          <span className="text-sm font-semibold text-gray-700 capitalize">{dateLabel}</span>
         </div>
-
-        <div className="flex items-center gap-2">
-          {/* Legenda */}
-          <div className="flex items-center gap-3 mr-2">
-            {Object.entries(TIPOS).map(([k, v]) => (
-              <span key={k} className="flex items-center gap-1.5 text-xs text-gray-500">
-                <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: v.color }} />
-                {v.label}
-              </span>
-            ))}
-          </div>
-          <button onClick={() => openNew()}
-            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-            <Plus size={15} /> Nova Agenda
-          </button>
+        {/* Legenda */}
+        <div className="flex items-center gap-3">
+          {Object.entries(TIPOS).map(([k, v]) => (
+            <span key={k} className="flex items-center gap-1.5 text-xs text-gray-500">
+              <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: v.color }} />
+              {v.label}
+            </span>
+          ))}
         </div>
-      </header>
+      </div>
 
       {/* Calendar content */}
       <div className="flex-1 overflow-hidden flex flex-col">
