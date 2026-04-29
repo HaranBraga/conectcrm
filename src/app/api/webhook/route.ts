@@ -1,23 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Normaliza número BR: 55 + DDD(2) + 8 dígitos → adiciona o 9º dígito
+// Formatos reais de número BR:
+//   55 + DDD(2) + 8 local (SEM 9º) = 12 dígitos  ← formato antigo
+//   55 + DDD(2) + 9 + 8 local       = 13 dígitos  ← formato novo (com 9º)
+// Contatos salvos manualmente muitas vezes não têm o prefixo 55:
+//   DDD(2) + 8 local         = 10 dígitos
+//   DDD(2) + 9 + 8 local     = 11 dígitos
+//
+// normalizePhone: 12→13 (adiciona 9º se faltar)
 function normalizePhone(digits: string): string {
-  if (digits.startsWith("55") && digits.length === 13) {
+  if (digits.startsWith("55") && digits.length === 12) {
     return `${digits.slice(0, 4)}9${digits.slice(4)}`;
   }
   return digits;
 }
 
-// Retorna o formato alternativo (com ↔ sem 9º dígito) para fallback de busca
-function alternatePhone(phone: string): string | null {
-  if (phone.startsWith("55") && phone.length === 14 && phone[4] === "9") {
-    return `${phone.slice(0, 4)}${phone.slice(5)}`;
+// Gera todas as variantes plausíveis para busca no banco
+function phoneVariants(raw: string): string[] {
+  const s = new Set<string>();
+  s.add(raw);
+
+  if (raw.startsWith("55")) {
+    const withoutPrefix = raw.slice(2);
+    s.add(withoutPrefix);
+
+    if (raw.length === 13) {
+      // 55+DDD+9+8 → variante sem 9º: 55+DDD+8 (12 dígitos)
+      s.add(`${raw.slice(0, 4)}${raw.slice(5)}`);
+      // sem prefixo 55 com 9: DDD+9+8 (11 dígitos)
+      s.add(withoutPrefix);
+      // sem prefixo 55 sem 9: DDD+8 (10 dígitos)
+      s.add(`${withoutPrefix.slice(0, 2)}${withoutPrefix.slice(3)}`);
+    }
+    if (raw.length === 12) {
+      // 55+DDD+8 → variante com 9º: 55+DDD+9+8 (13 dígitos)
+      s.add(`${raw.slice(0, 4)}9${raw.slice(4)}`);
+      // sem prefixo sem 9: DDD+8 (10 dígitos)
+      s.add(withoutPrefix);
+      // sem prefixo com 9: DDD+9+8 (11 dígitos)
+      s.add(`${withoutPrefix.slice(0, 2)}9${withoutPrefix.slice(2)}`);
+    }
+  } else {
+    // Número sem prefixo 55 → tentar com prefixo também
+    s.add(`55${raw}`);
+    if (raw.length === 11 && raw[2] === "9") {
+      // DDD+9+8 → sem 9: DDD+8
+      s.add(`${raw.slice(0, 2)}${raw.slice(3)}`);
+      s.add(`55${raw.slice(0, 2)}${raw.slice(3)}`);
+    }
+    if (raw.length === 10) {
+      // DDD+8 → com 9: DDD+9+8
+      s.add(`${raw.slice(0, 2)}9${raw.slice(2)}`);
+      s.add(`55${raw.slice(0, 2)}9${raw.slice(2)}`);
+    }
   }
-  if (phone.startsWith("55") && phone.length === 13) {
-    return `${phone.slice(0, 4)}9${phone.slice(4)}`;
-  }
-  return null;
+
+  return Array.from(s);
 }
 
 function extractText(data: any): string {
@@ -61,7 +100,8 @@ export async function POST(req: NextRequest) {
     }
 
     const fromMe: boolean = data?.key?.fromMe ?? false;
-    const phone = normalizePhone(remoteJid.replace("@s.whatsapp.net", "").replace(/\D/g, ""));
+    const rawDigits = remoteJid.replace("@s.whatsapp.net", "").replace(/\D/g, "");
+    const phone = normalizePhone(rawDigits); // formato canônico para criar contatos novos
     const pushName: string = data?.pushName ?? "";
     const text = extractText(data);
     const msgId: string = data?.key?.id ?? "";
@@ -71,11 +111,11 @@ export async function POST(req: NextRequest) {
 
     if (!text) return NextResponse.json({ ok: true });
 
-    // Busca ou cria contato (tenta formato alternativo 9º dígito se não encontrar)
-    let contact = await prisma.contact.findUnique({ where: { phone } });
-    if (!contact) {
-      const alt = alternatePhone(phone);
-      if (alt) contact = await prisma.contact.findUnique({ where: { phone: alt } });
+    // Busca contato em todas as variantes de formato (com/sem 55, com/sem 9º dígito)
+    let contact = null;
+    for (const variant of phoneVariants(rawDigits)) {
+      contact = await prisma.contact.findUnique({ where: { phone: variant } });
+      if (contact) break;
     }
     if (!contact) {
       const defaultStatus = await prisma.kanbanStatus.findFirst({ orderBy: { position: "asc" } });
