@@ -404,8 +404,8 @@ function EventPill({ evento, onClick, compact = false }: { evento: any; onClick:
 
 // ─── Month View ───────────────────────────────────────────────────────────────
 
-function MonthView({ ref: currentDate, events, onDayClick, onEventClick }: {
-  ref: Date; events: any[]; onDayClick: (d: Date) => void; onEventClick: (e: any) => void;
+function MonthView({ currentDate, events, onDayClick, onEventClick }: {
+  currentDate: Date; events: any[]; onDayClick: (d: Date) => void; onEventClick: (e: any) => void;
 }) {
   const cells = getMonthGrid(currentDate.getFullYear(), currentDate.getMonth());
 
@@ -447,8 +447,8 @@ function MonthView({ ref: currentDate, events, onDayClick, onEventClick }: {
 
 // ─── Week View ────────────────────────────────────────────────────────────────
 
-function WeekView({ ref: currentDate, events, onEventClick, onSlotClick }: {
-  ref: Date; events: any[]; onEventClick: (e: any) => void; onSlotClick: (d: Date) => void;
+function WeekView({ currentDate, events, onEventClick, onSlotClick }: {
+  currentDate: Date; events: any[]; onEventClick: (e: any) => void; onSlotClick: (d: Date) => void;
 }) {
   const days  = getWeekDays(currentDate);
   const hours = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => i + START_HOUR);
@@ -732,9 +732,9 @@ export default function AgendaPage() {
             <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : view === "mes" ? (
-          <MonthView ref={refDate} events={events} onDayClick={openNew} onEventClick={openEdit} />
+          <MonthView currentDate={refDate} events={events} onDayClick={openNew} onEventClick={openEdit} />
         ) : view === "semana" ? (
-          <WeekView ref={refDate} events={events} onEventClick={openEdit} onSlotClick={d => openNew(d)} />
+          <WeekView currentDate={refDate} events={events} onEventClick={openEdit} onSlotClick={d => openNew(d)} />
         ) : (
           <AgendaListView events={events} onEventClick={openEdit} />
         )}
