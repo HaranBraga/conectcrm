@@ -176,31 +176,18 @@ export function ConversationModal({ conversation, onClose, onCloseConversation, 
   const contact = conversation.contact;
 
   return (
-    <Modal open title="" onClose={onClose} size="xl">
+    <Modal open title="" onClose={onClose} size="lg">
       {/* ── Header ── */}
-      <div className="flex items-start gap-3 pb-4 mb-3 border-b border-gray-100">
-        <Avatar contact={contact} size={44} />
-
+      <div className="flex items-center gap-2 pb-3 mb-3 border-b border-gray-100">
+        <Avatar contact={contact} size={38} />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-0.5">
-            <p className="font-semibold text-gray-900 text-base">{contact.name}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="font-semibold text-gray-900 text-sm truncate">{contact.name}</p>
             {contact.role && <RoleBadge role={contact.role} />}
           </div>
-          <p className="text-xs text-gray-400 mb-2">{contact.phone}</p>
-
-          {/* Último contato */}
-          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            <Clock size={12} />
-            <span>Último contato:</span>
-            <input type="datetime-local" value={lastContact ? lastContact.slice(0, 16) : ""}
-              onChange={e => setLastContact(e.target.value)}
-              className="border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500" />
-            <button onClick={saveLastContact} className="text-brand-600 hover:underline text-xs">salvar</button>
-          </div>
+          <p className="text-xs text-gray-400">{contact.phone}</p>
         </div>
-
-        {/* Ações */}
-        <div className="flex flex-col items-end gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
           <LabelManager
             contactId={conversation.contactId}
             labels={labels}
@@ -209,14 +196,23 @@ export function ConversationModal({ conversation, onClose, onCloseConversation, 
           />
           <button
             onClick={() => { router.push(`/demandas?contactId=${conversation.contactId}&conversaId=${conversation.id}`); onClose(); }}
-            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg transition-colors">
-            <ClipboardList size={13} /> Criar demanda
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 px-2 py-1.5 rounded-lg transition-colors">
+            <ClipboardList size={13} /> Demanda
           </button>
           <button onClick={closeConversation}
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors">
-            <Archive size={13} /> Fechar conversa
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors">
+            <Archive size={13} /> Fechar
           </button>
         </div>
+      </div>
+      {/* Último contato — linha compacta */}
+      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
+        <Clock size={11} />
+        <span className="shrink-0">Último contato:</span>
+        <input type="datetime-local" value={lastContact ? lastContact.slice(0, 16) : ""}
+          onChange={e => setLastContact(e.target.value)}
+          className="border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 flex-1 min-w-0" />
+        <button onClick={saveLastContact} className="text-brand-600 hover:underline text-xs shrink-0">salvar</button>
       </div>
 
       {/* ── Mensagens ── */}
