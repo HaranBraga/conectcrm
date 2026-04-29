@@ -9,6 +9,7 @@ export async function GET() {
         where: { contact: { source: "message" }, closedAt: null },
         include: {
           contact: { select: { id: true, name: true, phone: true, role: true, lastContactAt: true, lastMessage: true, profilePhotoUrl: true, labels: true } },
+          _count: { select: { demandas: true } },
         },
         orderBy: { updatedAt: "desc" },
       },

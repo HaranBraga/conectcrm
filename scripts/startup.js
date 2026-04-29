@@ -64,10 +64,35 @@ async function seedLabels() {
   }
 }
 
+async function seedDemandaConfig() {
+  const defaults = {
+    demanda_statuses: JSON.stringify([
+      { key: "ANALISAR",     label: "Analisar",     color: "#6366f1", isClosed: false, position: 0 },
+      { key: "EM_ANDAMENTO", label: "Em Andamento", color: "#f59e0b", isClosed: false, position: 1 },
+      { key: "PENDENTE",     label: "Pendente",     color: "#f97316", isClosed: false, position: 2 },
+      { key: "ATENDIDA",     label: "Atendida",     color: "#10b981", isClosed: true,  position: 3 },
+      { key: "NAO_ATENDIDA", label: "Não Atendida", color: "#ef4444", isClosed: true,  position: 4 },
+    ]),
+    demanda_prioridades: JSON.stringify([
+      { key: "URGENTE",    label: "Urgente",    color: "#dc2626", bgColor: "#fee2e2", position: 0 },
+      { key: "IMPORTANTE", label: "Importante", color: "#ea580c", bgColor: "#ffedd5", position: 1 },
+      { key: "MEDIA",      label: "Média",      color: "#2563eb", bgColor: "#dbeafe", position: 2 },
+      { key: "NORMAL",     label: "Normal",     color: "#6b7280", bgColor: "#f3f4f6", position: 3 },
+    ]),
+    demanda_segmentos: JSON.stringify(["Saúde", "Esporte", "Ação"]),
+  };
+  for (const [key, value] of Object.entries(defaults)) {
+    const ex = await prisma.appConfig.findUnique({ where: { key } });
+    if (!ex) await prisma.appConfig.create({ data: { key, value } });
+  }
+  console.log("✅ Demanda config: status, prioridades e segmentos verificados");
+}
+
 async function main() {
   await seedRoles();
   await seedKanban();
   await seedLabels();
+  await seedDemandaConfig();
 }
 
 main()

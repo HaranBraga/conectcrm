@@ -33,6 +33,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       ...(lembrete      !== undefined && { lembrete: lembrete ? new Date(lembrete) : null }),
       ...(prazo         !== undefined && { prazo: prazo ? new Date(prazo) : null }),
       ...(fechadaEm     !== undefined && { fechadaEm: fechadaEm ? new Date(fechadaEm) : null }),
+      ...(body.arquivadaEm !== undefined && { arquivadaEm: body.arquivadaEm ? new Date(body.arquivadaEm) : null }),
     },
     include,
   });

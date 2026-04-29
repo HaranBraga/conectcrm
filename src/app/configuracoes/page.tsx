@@ -143,10 +143,204 @@ function LabelForm({ initial, onSave, onClose }: any) {
   );
 }
 
+// ─── Mini editor de lista (para status/prio/segmento de demandas) ─────────────
+
+function toKey(label: string) {
+  return label.toUpperCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/\s+/g, "_").replace(/[^A-Z0-9_]/g, "");
+}
+
+function DemandaStatusSection({ cfg, onChange }: {
+  cfg: { statuses: any[]; prioridades: any[]; segmentos: any[] };
+  onChange: (patch: any) => void;
+}) {
+  const [newLabel, setNewLabel]   = useState("");
+  const [newColor, setNewColor]   = useState("#6366f1");
+  const [editIdx,  setEditIdx]    = useState<number | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editColor, setEditColor] = useState("");
+  const [editClose, setEditClose] = useState(false);
+
+  function addStatus() {
+    if (!newLabel.trim()) return;
+    const key  = toKey(newLabel);
+    if (cfg.statuses.find(s => s.key === key)) { alert("Chave já existe"); return; }
+    const next = [...cfg.statuses, { key, label: newLabel.trim(), color: newColor, isClosed: false, position: cfg.statuses.length }];
+    onChange({ demanda_statuses: next });
+    setNewLabel(""); setNewColor("#6366f1");
+  }
+
+  function startEdit(i: number) {
+    const s = cfg.statuses[i];
+    setEditIdx(i); setEditLabel(s.label); setEditColor(s.color); setEditClose(s.isClosed);
+  }
+
+  function saveEdit() {
+    if (editIdx === null) return;
+    const next = cfg.statuses.map((s, i) => i === editIdx ? { ...s, label: editLabel, color: editColor, isClosed: editClose } : s);
+    onChange({ demanda_statuses: next }); setEditIdx(null);
+  }
+
+  function delStatus(i: number) {
+    onChange({ demanda_statuses: cfg.statuses.filter((_, j) => j !== i) });
+  }
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <div><h2 className="font-semibold text-gray-900">Status de Demandas</h2><p className="text-sm text-gray-500 mt-0.5">Colunas do kanban de demandas</p></div>
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 mb-3">
+        {cfg.statuses.length === 0 && <div className="py-8 text-center text-gray-400 text-sm">Nenhum status</div>}
+        {cfg.statuses.map((s, i) => (
+          <div key={s.key} className="flex items-center gap-3 px-4 py-3 group">
+            <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+            {editIdx === i ? (
+              <>
+                <input value={editLabel} onChange={e => setEditLabel(e.target.value)} className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                <input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="w-8 h-8 rounded border border-gray-200 cursor-pointer" />
+                <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+                  <input type="checkbox" checked={editClose} onChange={e => setEditClose(e.target.checked)} className="rounded" /> Fecha
+                </label>
+                <button onClick={saveEdit} className="text-xs bg-brand-600 text-white px-2.5 py-1 rounded-lg">OK</button>
+                <button onClick={() => setEditIdx(null)} className="text-xs text-gray-400">✕</button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 font-medium text-sm text-gray-800">{s.label}</span>
+                {s.isClosed && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Fecha</span>}
+                <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                  <button onClick={() => startEdit(i)} className="p-1.5 hover:bg-gray-100 rounded text-gray-500"><Edit2 size={13} /></button>
+                  <button onClick={() => delStatus(i)} className="p-1.5 hover:bg-red-100 rounded text-red-400"><Trash2 size={13} /></button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && addStatus()} placeholder="Novo status..." className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+        <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)} className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer" />
+        <button onClick={addStatus} className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white px-3 py-2 rounded-lg text-sm font-medium"><Plus size={14} /> Adicionar</button>
+      </div>
+    </section>
+  );
+}
+
+function DemandaPrioSection({ cfg, onChange }: { cfg: any; onChange: (patch: any) => void }) {
+  const [newLabel, setNewLabel] = useState("");
+  const [newColor, setNewColor] = useState("#6b7280");
+  const [newBg,    setNewBg]    = useState("#f3f4f6");
+  const [editIdx,  setEditIdx]  = useState<number | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editColor, setEditColor] = useState("");
+  const [editBg,    setEditBg]    = useState("");
+
+  function add() {
+    if (!newLabel.trim()) return;
+    const key = toKey(newLabel);
+    const next = [...cfg.prioridades, { key, label: newLabel.trim(), color: newColor, bgColor: newBg, position: cfg.prioridades.length }];
+    onChange({ demanda_prioridades: next }); setNewLabel(""); setNewColor("#6b7280"); setNewBg("#f3f4f6");
+  }
+
+  function startEdit(i: number) {
+    const p = cfg.prioridades[i];
+    setEditIdx(i); setEditLabel(p.label); setEditColor(p.color); setEditBg(p.bgColor);
+  }
+
+  function saveEdit() {
+    if (editIdx === null) return;
+    const next = cfg.prioridades.map((p: any, i: number) => i === editIdx ? { ...p, label: editLabel, color: editColor, bgColor: editBg } : p);
+    onChange({ demanda_prioridades: next }); setEditIdx(null);
+  }
+
+  return (
+    <section>
+      <div className="mb-3"><h2 className="font-semibold text-gray-900">Prioridades de Demandas</h2><p className="text-sm text-gray-500 mt-0.5">A ordem define a hierarquia (mais urgente primeiro)</p></div>
+      <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 mb-3">
+        {cfg.prioridades.map((p: any, i: number) => (
+          <div key={p.key} className="flex items-center gap-3 px-4 py-3 group">
+            {editIdx === i ? (
+              <>
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ color: editColor, backgroundColor: editBg }}>{editLabel || "Prévia"}</span>
+                <input value={editLabel} onChange={e => setEditLabel(e.target.value)} className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                <input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="w-8 h-8 rounded border border-gray-200 cursor-pointer" title="Cor do texto" />
+                <input type="color" value={editBg}    onChange={e => setEditBg(e.target.value)}    className="w-8 h-8 rounded border border-gray-200 cursor-pointer" title="Cor de fundo" />
+                <button onClick={saveEdit} className="text-xs bg-brand-600 text-white px-2.5 py-1 rounded-lg">OK</button>
+                <button onClick={() => setEditIdx(null)} className="text-xs text-gray-400">✕</button>
+              </>
+            ) : (
+              <>
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium shrink-0" style={{ color: p.color, backgroundColor: p.bgColor }}>{p.label}</span>
+                <span className="flex-1" />
+                <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                  <button onClick={() => startEdit(i)} className="p-1.5 hover:bg-gray-100 rounded text-gray-500"><Edit2 size={13} /></button>
+                  <button onClick={() => onChange({ demanda_prioridades: cfg.prioridades.filter((_: any, j: number) => j !== i) })} className="p-1.5 hover:bg-red-100 rounded text-red-400"><Trash2 size={13} /></button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} placeholder="Nova prioridade..." className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+        <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)} className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer" title="Cor texto" />
+        <input type="color" value={newBg}    onChange={e => setNewBg(e.target.value)}    className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer" title="Cor fundo" />
+        <button onClick={add} className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white px-3 py-2 rounded-lg text-sm font-medium"><Plus size={14} /> Adicionar</button>
+      </div>
+    </section>
+  );
+}
+
+function DemandaSegmentoSection({ cfg, onChange }: { cfg: any; onChange: (patch: any) => void }) {
+  const [newSeg, setNewSeg] = useState("");
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editVal,  setEditVal]  = useState("");
+
+  function add() {
+    if (!newSeg.trim() || cfg.segmentos.includes(newSeg.trim())) return;
+    onChange({ demanda_segmentos: [...cfg.segmentos, newSeg.trim()] }); setNewSeg("");
+  }
+
+  return (
+    <section>
+      <div className="mb-3"><h2 className="font-semibold text-gray-900">Segmentos de Demandas</h2><p className="text-sm text-gray-500 mt-0.5">Categorias de segmento para classificar demandas</p></div>
+      <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 mb-3">
+        {cfg.segmentos.map((s: string, i: number) => (
+          <div key={i} className="flex items-center gap-3 px-4 py-3 group">
+            {editIdx === i ? (
+              <>
+                <input value={editVal} onChange={e => setEditVal(e.target.value)} className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                <button onClick={() => { onChange({ demanda_segmentos: cfg.segmentos.map((x: string, j: number) => j === i ? editVal : x) }); setEditIdx(null); }} className="text-xs bg-brand-600 text-white px-2.5 py-1 rounded-lg">OK</button>
+                <button onClick={() => setEditIdx(null)} className="text-xs text-gray-400">✕</button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 text-sm text-gray-800">{s}</span>
+                <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                  <button onClick={() => { setEditIdx(i); setEditVal(s); }} className="p-1.5 hover:bg-gray-100 rounded text-gray-500"><Edit2 size={13} /></button>
+                  <button onClick={() => onChange({ demanda_segmentos: cfg.segmentos.filter((_: string, j: number) => j !== i) })} className="p-1.5 hover:bg-red-100 rounded text-red-400"><Trash2 size={13} /></button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input value={newSeg} onChange={e => setNewSeg(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} placeholder="Novo segmento..." className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+        <button onClick={add} className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white px-3 py-2 rounded-lg text-sm font-medium"><Plus size={14} /> Adicionar</button>
+      </div>
+    </section>
+  );
+}
+
 export default function ConfiguracoesPage() {
   const [statuses, setStatuses]     = useState<any[]>([]);
   const [roles, setRoles]           = useState<PersonRole[]>([]);
   const [labels, setLabels]         = useState<any[]>([]);
+  const [demandaCfg, setDemandaCfg] = useState<any>({ statuses: [], prioridades: [], segmentos: [] });
+  const [savingCfg, setSavingCfg]   = useState(false);
   const [modal, setModal]           = useState<"newStatus" | "editStatus" | "editRole" | "newLabel" | "editLabel" | null>(null);
   const [editingStatus, setEditingStatus] = useState<any | null>(null);
   const [editingRole, setEditingRole]     = useState<PersonRole | null>(null);
@@ -167,7 +361,29 @@ export default function ConfiguracoesPage() {
     setLabels(await r.json());
   }, []);
 
-  useEffect(() => { loadStatuses(); loadRoles(); loadLabels(); }, [loadStatuses, loadRoles, loadLabels]);
+  const loadDemandaCfg = useCallback(async () => {
+    const r = await fetch("/api/demandas/config");
+    setDemandaCfg(await r.json());
+  }, []);
+
+  useEffect(() => { loadStatuses(); loadRoles(); loadLabels(); loadDemandaCfg(); }, [loadStatuses, loadRoles, loadLabels, loadDemandaCfg]);
+
+  async function saveDemandaCfg(patch: any) {
+    const updated = { statuses: demandaCfg.statuses, prioridades: demandaCfg.prioridades, segmentos: demandaCfg.segmentos, ...patch };
+    setDemandaCfg(updated);
+    setSavingCfg(true);
+    try {
+      const body: any = {};
+      if (patch.demanda_statuses)    body.demanda_statuses    = patch.demanda_statuses ?? updated.statuses;
+      if (patch.demanda_prioridades) body.demanda_prioridades = patch.demanda_prioridades ?? updated.prioridades;
+      if (patch.demanda_segmentos)   body.demanda_segmentos   = patch.demanda_segmentos  ?? updated.segmentos;
+      if (patch.demanda_statuses !== undefined)    body.demanda_statuses    = patch.demanda_statuses;
+      if (patch.demanda_prioridades !== undefined) body.demanda_prioridades = patch.demanda_prioridades;
+      if (patch.demanda_segmentos !== undefined)   body.demanda_segmentos   = patch.demanda_segmentos;
+      await fetch("/api/demandas/config", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      await loadDemandaCfg();
+    } finally { setSavingCfg(false); }
+  }
 
   async function initSeed() {
     const r = await fetch("/api/seed", { method: "POST" });
@@ -252,6 +468,18 @@ export default function ConfiguracoesPage() {
             ))}
           </div>
         </section>
+
+        {/* Demanda: Status */}
+        <DemandaStatusSection cfg={demandaCfg}
+          onChange={patch => saveDemandaCfg(patch)} />
+
+        {/* Demanda: Prioridade */}
+        <DemandaPrioSection cfg={demandaCfg}
+          onChange={patch => saveDemandaCfg(patch)} />
+
+        {/* Demanda: Segmento */}
+        <DemandaSegmentoSection cfg={demandaCfg}
+          onChange={patch => saveDemandaCfg(patch)} />
 
         {/* Etiquetas */}
         <section>

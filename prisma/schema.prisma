@@ -162,33 +162,19 @@ model AppConfig {
   value String
 }
 
-enum DemandaStatus {
-  ANALISAR
-  EM_ANDAMENTO
-  PENDENTE
-  ATENDIDA
-  NAO_ATENDIDA
-}
-
-enum DemandaPrioridade {
-  URGENTE
-  IMPORTANTE
-  MEDIA
-  NORMAL
-}
-
 model Demanda {
-  id            String            @id @default(cuid())
+  id            String   @id @default(cuid())
   titulo        String
   descricao     String?
-  status        DemandaStatus     @default(ANALISAR)
+  status        String   @default("ANALISAR")
   segmento      String?
-  prioridade    DemandaPrioridade @default(NORMAL)
+  prioridade    String   @default("NORMAL")
   valor         Float?
   obs           String?
   lembrete      DateTime?
   prazo         DateTime?
   fechadaEm     DateTime?
+  arquivadaEm   DateTime?
 
   solicitanteId String
   solicitante   Contact      @relation("ContactDemandas", fields: [solicitanteId], references: [id])
@@ -201,6 +187,7 @@ model Demanda {
   @@index([status])
   @@index([solicitanteId])
   @@index([lembrete])
+  @@index([arquivadaEm])
 }
 
 model DispatchResult {
