@@ -460,13 +460,13 @@ function MonthView({ currentDate, events, calendarios, onDayClick, onEventClick 
 }) {
   const cells = getMonthGrid(currentDate.getFullYear(), currentDate.getMonth());
   return (
-    <div className="flex flex-col flex-1 overflow-hidden px-2 pt-1">
+    <div className="flex flex-col flex-1 overflow-hidden px-4 pt-2 min-h-0">
       <div className="grid grid-cols-7 border-b border-gray-100 shrink-0">
         {WEEKDAYS.map(d => (
           <div key={d} className="text-center text-[11px] font-semibold text-gray-400 py-1.5">{d}</div>
         ))}
       </div>
-      <div className="grid grid-cols-7 flex-1 overflow-auto" style={{ gridAutoRows: "minmax(70px, 1fr)" }}>
+      <div className="grid grid-cols-7 flex-1 overflow-auto min-h-0" style={{ gridAutoRows: "minmax(70px, 1fr)" }}>
         {cells.map((cell, i) => {
           const dayEvents = events.filter(e => isSameDay(new Date(e.inicio), cell));
           const inMonth   = isSameMonth(cell, currentDate);
@@ -513,9 +513,9 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
   }
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
+    <div className="flex flex-col flex-1 overflow-hidden min-h-0">
       {/* Day headers */}
-      <div className="flex shrink-0 border-b border-gray-100 mx-1">
+      <div className="flex shrink-0 border-b border-gray-100 mx-4">
         <div className="w-14 shrink-0" />
         {days.map((d, i) => (
           <div key={i} className="flex-1 text-center py-1.5 border-l border-gray-100 min-w-0">
@@ -526,8 +526,8 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
           </div>
         ))}
       </div>
-      {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto mx-1">
+      {/* Scrollable body — min-h-0 necessário para flex scroll funcionar */}
+      <div className="flex-1 overflow-y-auto mx-4 min-h-0">
         <div className="flex" style={{ height: TOTAL_H }}>
           {/* Hour labels */}
           <div className="w-14 shrink-0">
@@ -543,7 +543,7 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
           {/* Day columns */}
           {days.map((day, di) => (
             <div key={di} className="flex-1 border-l border-gray-100 min-w-0"
-              style={{ position: "relative", height: TOTAL_H }}>
+              style={{ position: "relative", height: TOTAL_H, overflow: "hidden" }}>
               {/* 30-min slots (clickable) */}
               {slots.map(({ hour, minute, isHalf, idx }) => (
                 <div key={idx}

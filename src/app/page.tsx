@@ -65,6 +65,13 @@ export default function KanbanPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // SSE: atualiza kanban em tempo real quando outro usuário move cards
+  useEffect(() => {
+    const es = new EventSource("/api/sse");
+    es.addEventListener("kanban", () => load());
+    return () => es.close();
+  }, [load]);
+
   const total = columns.reduce((s, c) => s + c.conversations.length, 0);
 
   if (loading) {
