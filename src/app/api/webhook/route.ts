@@ -198,6 +198,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    broadcast("mensagem", { conversationId: conversation.id });
     broadcast("kanban", { action: "message" });
     return NextResponse.json({ ok: true });
   } catch (e) {

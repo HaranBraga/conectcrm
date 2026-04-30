@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendText, sendMedia, sendMediaBase64, sendLink } from "@/lib/evolution";
+import { broadcast } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     where: { id: params.id },
     data: { closedAt: close ? new Date() : null },
   });
+  broadcast("kanban", { action: close ? "closed" : "reopened", id: params.id });
   return NextResponse.json(conversation);
 }
 
@@ -81,5 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     data: { lastContactAt: new Date(), lastMessage: content },
   });
 
+  broadcast("mensagem", { conversationId: params.id });
+  broadcast("kanban", { action: "message", conversationId: params.id });
   return NextResponse.json(msg, { status: 201 });
 }

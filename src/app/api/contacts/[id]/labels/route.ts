@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { broadcast } from "@/lib/sse";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const { labels } = await req.json();
@@ -8,5 +9,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     where: { id: params.id },
     data: { labels },
   });
+  broadcast("kanban", { action: "labels", contactId: params.id });
   return NextResponse.json(contact);
 }

@@ -246,7 +246,9 @@ export default function ConversasPage() {
   const [newConvModal, setNewConvModal] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [labelDefs, setLabelDefs] = useState<LabelDef[]>([]);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const bottomRef    = useRef<HTMLDivElement>(null);
+  const selectedRef  = useRef<any | null>(null);
+  useEffect(() => { selectedRef.current = selected; }, [selected]);
 
   useEffect(() => {
     fetch("/api/labels").then(r => r.json()).then(setLabelDefs);
@@ -293,18 +295,26 @@ export default function ConversasPage() {
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
-  // SSE: recarrega lista quando outro usuário move cards ou cria conversa
+  // SSE: recarrega lista e mensagens do chat aberto em tempo real
   useEffect(() => {
     const es = new EventSource("/api/sse");
     es.addEventListener("kanban", () => loadConversations());
+    es.addEventListener("mensagem", (e: MessageEvent) => {
+      const data = JSON.parse(e.data ?? "{}");
+      loadConversations();
+      // Se a mensagem é da conversa aberta, atualiza o chat imediatamente
+      if (selectedRef.current?.id === data.conversationId) {
+        loadMessages(selectedRef.current.id);
+      }
+    });
     return () => es.close();
-  }, [loadConversations]);
+  }, [loadConversations, loadMessages]);
 
   const selectedId = selected?.id;
   useEffect(() => {
     if (!selectedId || showArchived) return;
     loadMessages(selectedId);
-    const interval = setInterval(() => loadMessages(selectedId), 6000);
+    const interval = setInterval(() => loadMessages(selectedId), 30000);
     return () => clearInterval(interval);
   }, [selectedId, loadMessages, showArchived]);
 
