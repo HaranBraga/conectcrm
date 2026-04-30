@@ -143,10 +143,10 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
   const [presNome,    setPresNome]    = useState("");
   const [presTel,     setPresTel]     = useState("");
 
-  // Avaliações: 3 slots, sem obs
+  // Avaliações: 3 slots, anônimas
   const initAval = (slot: number) => {
     const found = initial?.avaliacoes?.find((a: any) => a.slot === slot);
-    return { slot, avaliador: found?.avaliador ?? null, avaliadorNome: found?.avaliadorNome ?? "", atencao: found?.atencao ?? 0, interacao: found?.interacao ?? 0 };
+    return { slot, atencao: found?.atencao ?? 0, interacao: found?.interacao ?? 0 };
   };
   const [aval, setAval] = useState([initAval(1), initAval(2), initAval(3)]);
 
@@ -196,11 +196,7 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
           liderId: lider?.id ?? null,
           anfitrioes: anfitrioes.map(a => ({ contactId: a.contactId ?? null, nome: a.nome ?? null, telefone: a.telefone ?? null })),
           presentes:  presentes.map(p =>  ({ contactId: p.contactId ?? null, nome: p.nome ?? null, telefone: p.telefone ?? null })),
-          avaliacoes: aval.map(a => ({
-            slot: a.slot, atencao: a.atencao, interacao: a.interacao,
-            avaliadorId:   a.avaliador?.id ?? null,
-            avaliadorNome: a.avaliadorNome || null,
-          })),
+          avaliacoes: aval.map(a => ({ slot: a.slot, atencao: a.atencao, interacao: a.interacao })),
         }),
       });
       if (!r.ok) { const d = await r.json(); toast.error(d.error ?? "Erro"); return; }
@@ -388,27 +384,12 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
       {/* Avaliações — sem obs, escala 0-5 */}
       <section>
         <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2.5">
-          <Star size={11} className="inline mr-1" />Avaliações da Equipe (3 avaliadores)
+          <Star size={11} className="inline mr-1" />Avaliações da Equipe
         </h3>
         <div className="flex flex-col gap-3">
           {aval.map(a => (
             <div key={a.slot} className="bg-gray-50 rounded-xl border border-gray-200 p-3">
-              <p className="text-xs font-semibold text-gray-500 mb-2">Avaliador {a.slot}</p>
-              <div className="mb-3">
-                {a.avaliador ? (
-                  <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5">
-                    <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-700 shrink-0">
-                      {a.avaliador.name?.[0]?.toUpperCase()}
-                    </div>
-                    <span className="text-xs font-medium text-gray-800 flex-1 truncate">{a.avaliador.name}</span>
-                    <button type="button" onClick={() => updateAval(a.slot, { avaliador: null })}
-                      className="text-gray-300 hover:text-red-400"><X size={11} /></button>
-                  </div>
-                ) : (
-                  <ContactSearch placeholder="Buscar avaliador na base..."
-                    onSelect={c => updateAval(a.slot, { avaliador: c, avaliadorNome: c.name })} />
-                )}
-              </div>
+              <p className="text-xs font-semibold text-gray-500 mb-2">Avaliação {a.slot}</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-gray-500 mb-1.5">Atenção</p>
