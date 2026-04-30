@@ -69,6 +69,11 @@ model Contact {
   agendaSolicitante  AgendaEvento[]   @relation("AgendaSolicitante")
   agendaAnfitrioes   AgendaAnfitriao[] @relation("ContactAnfitrioes")
 
+  reuniaoLider      Reuniao[]          @relation("ReuniaoLider")
+  reuniaoAnfitrioes ReuniaoAnfitriao[] @relation("ReuniaoAnfitrioes")
+  reuniaoPresentes  ReuniaoPresente[]  @relation("ReuniaoPresentes")
+  reuniaoAvaliacoes ReuniaoAvaliacao[] @relation("ReuniaoAvaliadores")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -109,6 +114,8 @@ model Conversation {
   closedAt        DateTime?
   messages        Message[]
   demandas        Demanda[]
+  reuniaoId       String?
+  reuniao         Reuniao? @relation("ReuniaoConversas", fields: [reuniaoId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -245,6 +252,63 @@ model AgendaAnfitriao {
   evento    AgendaEvento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
   contactId String
   contact   Contact      @relation("ContactAnfitrioes", fields: [contactId], references: [id])
+}
+
+model Reuniao {
+  id        String   @id @default(cuid())
+  titulo    String
+  dataHora  DateTime
+  local     String?
+  bairro    String?
+  zona      String?
+  status    String   @default("REALIZADA") // AGENDADA | REALIZADA | CANCELADA
+  notes     String?
+
+  liderId   String?
+  lider     Contact? @relation("ReuniaoLider", fields: [liderId], references: [id])
+
+  anfitrioes ReuniaoAnfitriao[]
+  presentes  ReuniaoPresente[]
+  avaliacoes ReuniaoAvaliacao[]
+  conversas  Conversation[]     @relation("ReuniaoConversas")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dataHora])
+  @@index([liderId])
+}
+
+model ReuniaoAnfitriao {
+  id        String  @id @default(cuid())
+  reuniaoId String
+  reuniao   Reuniao @relation(fields: [reuniaoId], references: [id], onDelete: Cascade)
+  contactId String
+  contact   Contact @relation("ReuniaoAnfitrioes", fields: [contactId], references: [id])
+}
+
+model ReuniaoPresente {
+  id        String   @id @default(cuid())
+  reuniaoId String
+  reuniao   Reuniao  @relation(fields: [reuniaoId], references: [id], onDelete: Cascade)
+  contactId String?
+  contact   Contact? @relation("ReuniaoPresentes", fields: [contactId], references: [id])
+  nome      String?   // entrada manual
+  telefone  String?   // entrada manual
+  createdAt DateTime  @default(now())
+}
+
+model ReuniaoAvaliacao {
+  id            String   @id @default(cuid())
+  reuniaoId     String
+  reuniao       Reuniao  @relation(fields: [reuniaoId], references: [id], onDelete: Cascade)
+  slot          Int      // 1, 2 ou 3
+  avaliadorId   String?
+  avaliador     Contact? @relation("ReuniaoAvaliadores", fields: [avaliadorId], references: [id])
+  avaliadorNome String?
+  atencao       Int      @default(0)  // 0–5
+  interacao     Int      @default(0)  // 0–5
+  obs           String?
 }
 
 model DispatchResult {
