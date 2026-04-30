@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { broadcast } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     where: { id: params.id },
     data: { ...(nome !== undefined && { nome }), ...(cor !== undefined && { cor }) },
   });
+  broadcast("agenda", { action: "calendario" });
   return NextResponse.json(cal);
 }
 
@@ -16,5 +18,6 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
   const count = await prisma.agendaEvento.count({ where: { calendarioId: params.id } });
   if (count > 0) return NextResponse.json({ error: `Calendário possui ${count} evento(s)` }, { status: 400 });
   await prisma.agendaCalendario.delete({ where: { id: params.id } });
+  broadcast("agenda", { action: "calendario" });
   return NextResponse.json({ ok: true });
 }

@@ -495,64 +495,72 @@ function MonthView({ currentDate, events, calendarios, onDayClick, onEventClick 
 
 // ─── Week View ────────────────────────────────────────────────────────────────
 
+const GRID_COLS = "56px repeat(7, 1fr)";
+const N_SLOTS   = (END_HOUR - START_HOUR) * 2; // slots de 30 min
+
 function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick }: {
   currentDate: Date; events: any[]; calendarios: any[];
   onEventClick: (e: any) => void; onSlotClick: (d: Date) => void;
 }) {
-  const days  = getWeekDays(currentDate);
-  const hours = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => i + START_HOUR);
-  const slots = Array.from({ length: (END_HOUR - START_HOUR) * 2 }, (_, i) => ({
-    hour: Math.floor(i / 2) + START_HOUR,
-    minute: (i % 2) * 30,
-    isHalf: i % 2 === 1,
-    idx: i,
-  }));
+  const days = getWeekDays(currentDate);
 
   function eventsForDay(day: Date) {
     return events.filter(e => isSameDay(new Date(e.inicio), day));
   }
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden min-h-0">
-      {/* Day headers */}
-      <div className="flex shrink-0 border-b border-gray-100 mx-4">
-        <div className="w-14 shrink-0" />
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-4">
+
+      {/* Cabeçalho dos dias — mesmo grid-template que o corpo */}
+      <div className="grid shrink-0 border-b border-gray-100 bg-white"
+        style={{ gridTemplateColumns: GRID_COLS }}>
+        <div /> {/* espaço da coluna de horas */}
         {days.map((d, i) => (
-          <div key={i} className="flex-1 text-center py-1.5 border-l border-gray-100 min-w-0">
+          <div key={i} className="text-center py-1.5 border-l border-gray-100">
             <p className="text-[10px] font-medium text-gray-400 uppercase">{WEEKDAYS[d.getDay()]}</p>
-            <div className={`text-xs font-bold mx-auto w-6 h-6 flex items-center justify-center rounded-full ${isToday(d) ? "bg-brand-600 text-white" : "text-gray-700"}`}>
+            <div className={`text-xs font-bold mx-auto w-6 h-6 flex items-center justify-center rounded-full
+              ${isToday(d) ? "bg-brand-600 text-white" : "text-gray-700"}`}>
               {d.getDate()}
             </div>
           </div>
         ))}
       </div>
-      {/* Scrollable body — min-h-0 necessário para flex scroll funcionar */}
-      <div className="flex-1 overflow-y-auto mx-4 min-h-0">
-        <div className="flex" style={{ height: TOTAL_H }}>
-          {/* Hour labels */}
-          <div className="w-14 shrink-0">
-            {hours.map(h => (
-              <div key={h} style={{ height: HOUR_PX }} className="relative">
-                <div className="flex items-start justify-end pr-2 pt-0.5 border-b border-gray-100" style={{ height: HOUR_PX / 2 }}>
-                  <span className="text-[10px] text-gray-400 -translate-y-1.5">{h}:00</span>
-                </div>
-                <div className="border-b border-gray-50" style={{ height: HOUR_PX / 2 }} />
+
+      {/* Grade horária (rolável) */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="grid" style={{ gridTemplateColumns: GRID_COLS, height: TOTAL_H }}>
+
+          {/* Coluna de rótulos de hora */}
+          <div style={{ position: "relative" }}>
+            {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
+              <div key={i} className="border-b border-gray-100 absolute w-full flex items-start justify-end pr-2"
+                style={{ top: i * HOUR_PX, height: HOUR_PX }}>
+                <span className="text-[10px] text-gray-400 -mt-2">{i + START_HOUR}:00</span>
               </div>
             ))}
           </div>
-          {/* Day columns */}
+
+          {/* Colunas de dias */}
           {days.map((day, di) => (
-            <div key={di} className="flex-1 border-l border-gray-100 min-w-0"
-              style={{ position: "relative", height: TOTAL_H, overflow: "hidden" }}>
-              {/* 30-min slots (clickable) */}
-              {slots.map(({ hour, minute, isHalf, idx }) => (
-                <div key={idx}
-                  style={{ position: "absolute", top: idx * (HOUR_PX / 2), left: 0, right: 0, height: HOUR_PX / 2 }}
-                  className={`${isHalf ? "border-b border-gray-50" : "border-b border-gray-100"} hover:bg-indigo-50/30 cursor-pointer`}
-                  onClick={() => { const d = new Date(day); d.setHours(hour, minute, 0, 0); onSlotClick(d); }}
-                />
-              ))}
-              {/* Events */}
+            <div key={di} className="border-l border-gray-100 overflow-hidden"
+              style={{ position: "relative", height: TOTAL_H }}>
+
+              {/* Slots clicáveis de 30 min */}
+              {Array.from({ length: N_SLOTS }, (_, idx) => {
+                const h = Math.floor(idx / 2) + START_HOUR;
+                const m = (idx % 2) * 30;
+                const half = idx % 2 === 1;
+                return (
+                  <div key={idx}
+                    className={`absolute w-full cursor-pointer hover:bg-indigo-50/30
+                      ${half ? "border-b border-gray-50" : "border-b border-gray-100"}`}
+                    style={{ top: idx * (HOUR_PX / 2), height: HOUR_PX / 2 }}
+                    onClick={() => { const d = new Date(day); d.setHours(h, m, 0, 0); onSlotClick(d); }}
+                  />
+                );
+              })}
+
+              {/* Eventos */}
               {eventsForDay(day).map(ev => {
                 const start   = new Date(ev.inicio);
                 const minFrom = (start.getHours() - START_HOUR) * 60 + start.getMinutes();
@@ -564,15 +572,15 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
                 const bg  = cal ? `${col}22` : t.bg;
                 return (
                   <div key={ev.id} onClick={() => onEventClick(ev)}
+                    className="absolute rounded-md px-1.5 py-0.5 text-[11px] cursor-pointer overflow-hidden shadow-sm"
                     style={{
-                      position: "absolute",
-                      top: `${(minFrom / 60) * HOUR_PX}px`,
-                      height: `${Math.max(20, (dur / 60) * HOUR_PX - 2)}px`,
+                      top:    (minFrom / 60) * HOUR_PX,
+                      height: Math.max(22, (dur / 60) * HOUR_PX - 2),
                       left: 2, right: 2,
+                      zIndex: 10,
                       backgroundColor: bg, color: col,
                       borderLeft: `3px solid ${col}`,
-                    }}
-                    className="rounded-md px-1.5 py-0.5 text-[11px] cursor-pointer z-10 overflow-hidden shadow-sm">
+                    }}>
                     <p className="font-semibold truncate leading-tight">{ev.titulo}</p>
                     <p className="opacity-70 leading-none">{format(start, "HH:mm")}</p>
                   </div>
@@ -580,6 +588,7 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
               })}
             </div>
           ))}
+
         </div>
       </div>
     </div>
@@ -708,13 +717,15 @@ export default function AgendaPage() {
   const [selected, setSelected] = useState<any | null>(null);
   const [defaultDate, setDefaultDate] = useState<Date | undefined>();
 
-  // Load calendários
-  useEffect(() => {
-    fetch("/api/agenda/calendarios").then(r => r.json()).then((cals: any[]) => {
-      setCalendarios(cals);
-      setSelectedCals(cals.map(c => c.id)); // all selected by default
-    });
+  // Load calendários — primeira vez seleciona todos; reloads SSE preservam a seleção
+  const loadCalendarios = useCallback(async (preserveSelection = false) => {
+    const r = await fetch("/api/agenda/calendarios");
+    const cals: any[] = await r.json();
+    setCalendarios(cals);
+    if (!preserveSelection) setSelectedCals(cals.map(c => c.id));
   }, []);
+
+  useEffect(() => { loadCalendarios(false); }, [loadCalendarios]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -727,12 +738,16 @@ export default function AgendaPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // SSE: recarrega quando outro usuário cria/edita/deleta evento
+  // SSE: recarrega eventos e calendários quando outro usuário muta a agenda
   useEffect(() => {
     const es = new EventSource("/api/sse");
-    es.addEventListener("agenda", () => load(true));
+    es.addEventListener("agenda", (e: MessageEvent) => {
+      const data = JSON.parse(e.data ?? "{}");
+      load(true);
+      if (data.action === "calendario") loadCalendarios(true); // preserva seleção atual
+    });
     return () => es.close();
-  }, [load]);
+  }, [load, loadCalendarios]);
 
   // Filter events by selected calendars
   const events = selectedCals.length === 0 ? allEvents : allEvents.filter(ev =>
