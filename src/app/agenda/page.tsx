@@ -498,7 +498,7 @@ function MonthView({ currentDate, events, calendarios, onDayClick, onEventClick 
 const TIME_COL_W = 56;
 const N_SLOTS    = (END_HOUR - START_HOUR) * 2;
 
-// Posição esquerda e largura de cada coluna de dia — mesma fórmula em header e body
+// Posição e largura de cada coluna de dia — mesma fórmula em header e body
 const dayLeft  = (i: number) => `calc(${TIME_COL_W}px + (100% - ${TIME_COL_W}px) * ${i} / 7)`;
 const dayWidth = `calc((100% - ${TIME_COL_W}px) / 7)`;
 
@@ -510,7 +510,6 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
   const dayHeaderRef = useRef<HTMLDivElement>(null);
   const [scrollH, setScrollH] = useState(500);
 
-  // ResizeObserver: mede altura exata disponível
   useEffect(() => {
     const measure = () => {
       if (!containerRef.current || !dayHeaderRef.current) return;
@@ -530,35 +529,39 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
   }
 
   return (
-    <div ref={containerRef} className="flex flex-col flex-1 overflow-hidden">
+    <div ref={containerRef} className="flex flex-col flex-1 overflow-hidden px-4 pt-2">
 
-      {/* Cabeçalho — colunas posicionadas por calc(), mesma fórmula do corpo */}
-      <div ref={dayHeaderRef} className="relative shrink-0 border-b border-gray-100 bg-white"
-        style={{ height: 46 }}>
+      {/* Cabeçalho — mesmo estilo da MonthView (tema unificado) */}
+      <div ref={dayHeaderRef} className="relative shrink-0 border-b border-gray-100 bg-white">
         {days.map((d, i) => (
           <div key={i}
-            className="absolute top-0 text-center border-l border-gray-100"
-            style={{ left: dayLeft(i), width: dayWidth, height: 46, padding: "4px 0" }}>
-            <p className="text-[11px] font-semibold text-gray-400 uppercase leading-none">{WEEKDAYS[d.getDay()]}</p>
-            <div className={`text-xs font-bold mx-auto w-6 h-6 flex items-center justify-center rounded-full mt-1
-              ${isToday(d) ? "bg-brand-600 text-white" : "text-gray-700"}`}>
-              {d.getDate()}
-            </div>
+            className="absolute top-0 text-center py-1.5 border-l border-gray-100"
+            style={{ left: dayLeft(i), width: dayWidth }}>
+            <p className="text-[11px] font-semibold text-gray-400">
+              {WEEKDAYS[d.getDay()]}
+              <span className={`ml-1.5 ${isToday(d) ? "text-brand-600 font-bold" : "text-gray-700"}`}>
+                {d.getDate()}
+              </span>
+            </p>
           </div>
         ))}
+        {/* placeholder para dar altura ao header (matching content) */}
+        <div style={{ height: 30 }} />
       </div>
 
-      {/* Grade horária rolável — altura em pixels exatos */}
+      {/* Grade horária — altura exata via ResizeObserver */}
       <div style={{ height: scrollH, overflowY: "scroll" }}>
         <div className="relative" style={{ height: TOTAL_H, width: "100%" }}>
 
-          {/* Coluna de horas (sticky à esquerda) */}
+          {/* Coluna de horas — divs em fluxo natural com border-bottom
+              → as linhas de hora são fisicamente as mesmas que separam os slots
+              → labels no topo de cada hora, alinhados com o início do evento */}
           <div className="absolute top-0 left-0" style={{ width: TIME_COL_W, height: TOTAL_H }}>
             {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
               <div key={i}
-                className="absolute w-full border-b border-gray-100 flex items-start justify-end pr-2"
-                style={{ top: i * HOUR_PX, height: HOUR_PX }}>
-                <span className="text-[10px] text-gray-400" style={{ marginTop: -7 }}>{i + START_HOUR}:00</span>
+                className="border-b border-gray-100 flex items-start justify-end pr-2"
+                style={{ height: HOUR_PX, paddingTop: 3 }}>
+                <span className="text-[10px] text-gray-400 leading-none">{i + START_HOUR}:00</span>
               </div>
             ))}
           </div>
@@ -569,14 +572,16 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
               className="absolute top-0 border-l border-gray-100 overflow-hidden"
               style={{ left: dayLeft(di), width: dayWidth, height: TOTAL_H }}>
 
-              {/* Slots de 30 min */}
+              {/* Slots de 30 min — borda cheia em hora cheia, leve em meia */}
               {Array.from({ length: N_SLOTS }, (_, idx) => {
-                const h    = Math.floor(idx / 2) + START_HOUR;
-                const m    = (idx % 2) * 30;
-                const half = idx % 2 === 1;
+                const h = Math.floor(idx / 2) + START_HOUR;
+                const m = (idx % 2) * 30;
+                // Bottom do slot 0 (7:00→7:30) cai em 7:30 = meia (leve)
+                // Bottom do slot 1 (7:30→8:00) cai em 8:00 = cheia (forte)
+                const bottomIsFullHour = idx % 2 === 1;
                 return (
                   <div key={idx}
-                    className={`absolute w-full cursor-pointer hover:bg-indigo-50/30 ${half ? "border-b border-gray-50" : "border-b border-gray-100"}`}
+                    className={`absolute w-full cursor-pointer hover:bg-indigo-50/30 ${bottomIsFullHour ? "border-b border-gray-100" : "border-b border-gray-50"}`}
                     style={{ top: idx * (HOUR_PX / 2), height: HOUR_PX / 2 }}
                     onClick={() => { const d = new Date(day); d.setHours(h, m, 0, 0); onSlotClick(d); }}
                   />
