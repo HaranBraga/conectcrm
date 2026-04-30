@@ -209,7 +209,7 @@ function EventForm({ initial, defaultDate, calendarios, onSave, onClose, onDelet
         method, headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           titulo, assunto, tipo, status,
-          inicio, // datetime-local value — browser interprets as local, serializes to UTC
+          inicio: new Date(inicio).toISOString(),
           duracao: duracao ? parseInt(duracao) : null,
           local, bairro, zona,
           quantidadePessoas: qtdPessoas ? parseInt(qtdPessoas) : null,
@@ -760,45 +760,32 @@ export default function AgendaPage() {
           </div>
           <span className="text-sm font-semibold text-gray-700 capitalize">{dateLabel}</span>
         </div>
-        {/* Tipo legenda */}
+        {/* Calendários – filtro rápido */}
         <div className="flex items-center gap-3">
-          {Object.entries(TIPOS).map(([k, v]) => (
-            <span key={k} className="flex items-center gap-1.5 text-xs text-gray-500">
-              <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: v.color }} />{v.label}
-            </span>
+          {calendarios.map(cal => (
+            <label key={cal.id} className="flex items-center gap-1.5 cursor-pointer select-none">
+              <input type="checkbox" checked={selectedCals.includes(cal.id)} onChange={() => toggleCal(cal.id)}
+                className="w-3.5 h-3.5 rounded" style={{ accentColor: cal.cor }} />
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cal.cor }} />
+              <span className="text-xs text-gray-600">{cal.nome}</span>
+            </label>
           ))}
         </div>
       </div>
 
-      {/* Body: sidebar + calendar */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar calendários */}
-        <aside className="w-44 border-r border-gray-100 bg-white flex flex-col shrink-0 overflow-y-auto py-3">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase px-3 mb-1.5">Calendários</p>
-          {calendarios.map(cal => (
-            <label key={cal.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" checked={selectedCals.includes(cal.id)} onChange={() => toggleCal(cal.id)}
-                className="rounded w-3.5 h-3.5" style={{ accentColor: cal.cor }} />
-              <span className="text-xs text-gray-700 truncate">{cal.nome}</span>
-              <span className="w-2 h-2 rounded-full shrink-0 ml-auto" style={{ backgroundColor: cal.cor }} />
-            </label>
-          ))}
-        </aside>
-
-        {/* Calendar content */}
-        <div className="flex-1 overflow-hidden flex flex-col">
-          {loading ? (
-            <div className="flex justify-center items-center flex-1">
-              <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : view === "mes" ? (
-            <MonthView currentDate={refDate} events={events} calendarios={calendarios} onDayClick={openNew} onEventClick={openEdit} />
-          ) : view === "semana" ? (
-            <WeekView currentDate={refDate} events={events} calendarios={calendarios} onEventClick={openEdit} onSlotClick={d => openNew(d)} />
-          ) : (
-            <AgendaListView events={events} calendarios={calendarios} onEventClick={openEdit} />
-          )}
-        </div>
+      {/* Calendar content */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {loading ? (
+          <div className="flex justify-center items-center flex-1">
+            <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : view === "mes" ? (
+          <MonthView currentDate={refDate} events={events} calendarios={calendarios} onDayClick={openNew} onEventClick={openEdit} />
+        ) : view === "semana" ? (
+          <WeekView currentDate={refDate} events={events} calendarios={calendarios} onEventClick={openEdit} onSlotClick={d => openNew(d)} />
+        ) : (
+          <AgendaListView events={events} calendarios={calendarios} onEventClick={openEdit} />
+        )}
       </div>
 
       {/* Modal */}
