@@ -568,6 +568,13 @@ export default function DemandasPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // SSE: recarrega quando outro usuário muta demandas
+  useEffect(() => {
+    const es = new EventSource("/api/sse");
+    es.addEventListener("demandas", () => load());
+    return () => es.close();
+  }, [load]);
+
   const columns = cfg.statuses
     .slice().sort((a, b) => a.position - b.position)
     .map(col => ({

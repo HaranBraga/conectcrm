@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { broadcast } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
 
@@ -56,5 +57,6 @@ export async function POST(req: NextRequest) {
     },
     include,
   });
+  broadcast("agenda", { action: "created", id: evento.id });
   return NextResponse.json(evento, { status: 201 });
 }

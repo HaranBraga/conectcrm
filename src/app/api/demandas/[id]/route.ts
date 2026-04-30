@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { broadcast } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
 
@@ -39,10 +40,12 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     },
     include,
   });
+  broadcast("demandas", { action: "updated", id: params.id });
   return NextResponse.json(demanda);
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   await prisma.demanda.delete({ where: { id: params.id } });
+  broadcast("demandas", { action: "deleted", id: params.id });
   return NextResponse.json({ ok: true });
 }

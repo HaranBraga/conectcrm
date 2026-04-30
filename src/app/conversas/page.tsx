@@ -293,6 +293,13 @@ export default function ConversasPage() {
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
+  // SSE: recarrega lista quando outro usuário move cards ou cria conversa
+  useEffect(() => {
+    const es = new EventSource("/api/sse");
+    es.addEventListener("kanban", () => loadConversations());
+    return () => es.close();
+  }, [loadConversations]);
+
   const selectedId = selected?.id;
   useEffect(() => {
     if (!selectedId || showArchived) return;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { broadcast } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
     data: { contactId, statusId: firstStatus.id },
     include: { contact: contactSelect, status: true },
   });
+  broadcast("kanban", { action: "created" });
   return NextResponse.json(conversation, { status: 201 });
 }
 
@@ -58,5 +60,6 @@ export async function PATCH(req: NextRequest) {
     where: { id: conversationId },
     data: { statusId },
   });
+  broadcast("kanban", { action: "moved" });
   return NextResponse.json(conversation);
 }

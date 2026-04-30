@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { broadcast } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
 
@@ -62,5 +63,6 @@ export async function POST(req: NextRequest) {
     },
     include,
   });
+  broadcast("demandas", { action: "created", id: demanda.id });
   return NextResponse.json(demanda, { status: 201 });
 }

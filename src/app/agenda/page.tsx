@@ -727,6 +727,13 @@ export default function AgendaPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // SSE: recarrega quando outro usuário cria/edita/deleta evento
+  useEffect(() => {
+    const es = new EventSource("/api/sse");
+    es.addEventListener("agenda", () => load());
+    return () => es.close();
+  }, [load]);
+
   // Filter events by selected calendars
   const events = selectedCals.length === 0 ? allEvents : allEvents.filter(ev =>
     !ev.calendarioId || selectedCals.includes(ev.calendarioId)

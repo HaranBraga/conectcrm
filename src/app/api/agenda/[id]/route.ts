@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { broadcast } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     },
     include,
   });
+  broadcast("agenda", { action: "updated", id: params.id });
   return NextResponse.json(evento);
 }
 
@@ -69,10 +71,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     data: { ...(status !== undefined && { status }) },
     include,
   });
+  broadcast("agenda", { action: "updated", id: params.id });
   return NextResponse.json(evento);
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   await prisma.agendaEvento.delete({ where: { id: params.id } });
+  broadcast("agenda", { action: "deleted", id: params.id });
   return NextResponse.json({ ok: true });
 }
