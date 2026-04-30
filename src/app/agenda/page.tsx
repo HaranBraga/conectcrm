@@ -124,9 +124,9 @@ function ContactSearch({ placeholder = "Buscar contato...", onSelect }: {
 
 const INP = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500";
 
-function EventForm({ initial, defaultDate, calendarios, onSave, onClose, onDelete }: {
+function EventForm({ initial, defaultDate, calendarios, onSave, onQuickSave, onClose, onDelete }: {
   initial?: any; defaultDate?: Date; calendarios: any[];
-  onSave: (e: any) => void; onClose: () => void; onDelete?: () => void;
+  onSave: (e: any) => void; onQuickSave?: () => void; onClose: () => void; onDelete?: () => void;
 }) {
   const [tipo,       setTipo]       = useState(initial?.tipo      ?? "AGENDA");
   const [titulo,     setTitulo]     = useState(initial?.titulo     ?? "");
@@ -137,7 +137,7 @@ function EventForm({ initial, defaultDate, calendarios, onSave, onClose, onDelet
   );
   const [inicio,     setInicio]     = useState(
     initial?.inicio   ? isoToLocal(initial.inicio)
-    : defaultDate     ? format(defaultDate, "yyyy-MM-dd'T'08:00")
+    : defaultDate     ? format(defaultDate, "yyyy-MM-dd'T'HH:mm")
     : format(new Date(), "yyyy-MM-dd'T'08:00")
   );
   const [duracao,    setDuracao]    = useState(String(initial?.duracao  ?? 60));
@@ -164,6 +164,18 @@ function EventForm({ initial, defaultDate, calendarios, onSave, onClose, onDelet
   const [saving,   setSaving]   = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  async function quickStatus(newStatus: string) {
+    setStatus(newStatus);
+    if (!initial?.id) return;
+    await fetch(`/api/agenda/${initial.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    toast.success("Status atualizado");
+    onQuickSave?.();
+  }
+
   const anfIds = anfitrioes.map(a => a.id).join(",");
   useEffect(() => {
     if (!anfIds) { setDemandas([]); return; }
@@ -185,6 +197,7 @@ function EventForm({ initial, defaultDate, calendarios, onSave, onClose, onDelet
     const all: any[] = await r.json();
     return all.filter(ev => {
       if (initial?.id && ev.id === initial.id) return false;
+      if (calendarioId && ev.calendarioId && calendarioId !== ev.calendarioId) return false;
       const evStart = new Date(ev.inicio).getTime();
       const evEnd   = evStart + (ev.duracao ?? 60) * 60000;
       return startMs < evEnd && endMs > evStart;
@@ -256,7 +269,7 @@ function EventForm({ initial, defaultDate, calendarios, onSave, onClose, onDelet
       {/* Status */}
       <div className="flex gap-1.5 flex-wrap">
         {Object.entries(STATUS_CFG).map(([key, cfg]) => (
-          <button key={key} type="button" onClick={() => setStatus(key)}
+          <button key={key} type="button" onClick={() => quickStatus(key)}
             className={`text-xs px-3 py-1 rounded-full border font-medium transition-all ${status === key ? "text-white border-transparent" : "bg-white border-gray-200 text-gray-500"}`}
             style={status === key ? { backgroundColor: cfg.color } : {}}>
             {cfg.label}
@@ -447,7 +460,7 @@ function MonthView({ currentDate, events, calendarios, onDayClick, onEventClick 
 }) {
   const cells = getMonthGrid(currentDate.getFullYear(), currentDate.getMonth());
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
+    <div className="flex flex-col flex-1 overflow-hidden px-2 pt-1">
       <div className="grid grid-cols-7 border-b border-gray-100 shrink-0">
         {WEEKDAYS.map(d => (
           <div key={d} className="text-center text-[11px] font-semibold text-gray-400 py-1.5">{d}</div>
@@ -488,6 +501,12 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
 }) {
   const days  = getWeekDays(currentDate);
   const hours = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => i + START_HOUR);
+  const slots = Array.from({ length: (END_HOUR - START_HOUR) * 2 }, (_, i) => ({
+    hour: Math.floor(i / 2) + START_HOUR,
+    minute: (i % 2) * 30,
+    isHalf: i % 2 === 1,
+    idx: i,
+  }));
 
   function eventsForDay(day: Date) {
     return events.filter(e => isSameDay(new Date(e.inicio), day));
@@ -496,7 +515,7 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Day headers */}
-      <div className="flex shrink-0 border-b border-gray-100">
+      <div className="flex shrink-0 border-b border-gray-100 mx-1">
         <div className="w-14 shrink-0" />
         {days.map((d, i) => (
           <div key={i} className="flex-1 text-center py-1.5 border-l border-gray-100 min-w-0">
@@ -508,14 +527,16 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
         ))}
       </div>
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto mx-1">
         <div className="flex" style={{ height: TOTAL_H }}>
           {/* Hour labels */}
           <div className="w-14 shrink-0">
             {hours.map(h => (
-              <div key={h} style={{ height: HOUR_PX }}
-                className="flex items-start justify-end pr-2 pt-0.5 border-b border-gray-100">
-                <span className="text-[10px] text-gray-400">{h}:00</span>
+              <div key={h} style={{ height: HOUR_PX }} className="relative">
+                <div className="flex items-start justify-end pr-2 pt-0.5 border-b border-gray-100" style={{ height: HOUR_PX / 2 }}>
+                  <span className="text-[10px] text-gray-400 -translate-y-1.5">{h}:00</span>
+                </div>
+                <div className="border-b border-gray-50" style={{ height: HOUR_PX / 2 }} />
               </div>
             ))}
           </div>
@@ -523,12 +544,12 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
           {days.map((day, di) => (
             <div key={di} className="flex-1 border-l border-gray-100 min-w-0"
               style={{ position: "relative", height: TOTAL_H }}>
-              {/* Hour slots (clickable) */}
-              {hours.map(h => (
-                <div key={h}
-                  style={{ position: "absolute", top: (h - START_HOUR) * HOUR_PX, left: 0, right: 0, height: HOUR_PX }}
-                  className="border-b border-gray-100 hover:bg-gray-50/50 cursor-pointer"
-                  onClick={() => { const d = new Date(day); d.setHours(h, 0, 0, 0); onSlotClick(d); }}
+              {/* 30-min slots (clickable) */}
+              {slots.map(({ hour, minute, isHalf, idx }) => (
+                <div key={idx}
+                  style={{ position: "absolute", top: idx * (HOUR_PX / 2), left: 0, right: 0, height: HOUR_PX / 2 }}
+                  className={`${isHalf ? "border-b border-gray-50" : "border-b border-gray-100"} hover:bg-indigo-50/30 cursor-pointer`}
+                  onClick={() => { const d = new Date(day); d.setHours(hour, minute, 0, 0); onSlotClick(d); }}
                 />
               ))}
               {/* Events */}
@@ -546,7 +567,7 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
                     style={{
                       position: "absolute",
                       top: `${(minFrom / 60) * HOUR_PX}px`,
-                      height: `${Math.max(18, (dur / 60) * HOUR_PX - 2)}px`,
+                      height: `${Math.max(20, (dur / 60) * HOUR_PX - 2)}px`,
                       left: 2, right: 2,
                       backgroundColor: bg, color: col,
                       borderLeft: `3px solid ${col}`,
@@ -584,7 +605,7 @@ function AgendaListView({ events, calendarios, onEventClick }: {
     </div>
   );
   return (
-    <div className="flex-1 overflow-y-auto p-4">
+    <div className="flex-1 overflow-y-auto px-4 py-3">
       <div className="max-w-2xl mx-auto flex flex-col gap-5">
         {Object.entries(grouped).map(([dayKey, dayEvents]) => {
           const day = new Date(dayKey + "T12:00:00");
@@ -672,7 +693,7 @@ function navigate(view: ViewType, ref: Date, dir: -1 | 1): Date {
   if (view === "mes")    return dir > 0 ? addMonths(ref, 1) : subMonths(ref, 1);
   if (view === "semana") return dir > 0 ? addWeeks(ref, 1)  : subWeeks(ref, 1);
   const d = new Date(ref);
-  d.setDate(d.getDate() + dir * 60);
+  d.setDate(d.getDate() + dir);
   return d;
 }
 
@@ -762,14 +783,23 @@ export default function AgendaPage() {
         </div>
         {/* Calendários – filtro rápido */}
         <div className="flex items-center gap-3">
-          {calendarios.map(cal => (
-            <label key={cal.id} className="flex items-center gap-1.5 cursor-pointer select-none">
-              <input type="checkbox" checked={selectedCals.includes(cal.id)} onChange={() => toggleCal(cal.id)}
-                className="w-3.5 h-3.5 rounded" style={{ accentColor: cal.cor }} />
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cal.cor }} />
-              <span className="text-xs text-gray-600">{cal.nome}</span>
-            </label>
-          ))}
+          {calendarios.map(cal => {
+            const on = selectedCals.includes(cal.id);
+            return (
+              <button key={cal.id} type="button" onClick={() => toggleCal(cal.id)}
+                className="flex items-center gap-1.5 cursor-pointer select-none">
+                <span className="w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all"
+                  style={on ? { backgroundColor: cal.cor, borderColor: cal.cor } : { backgroundColor: "#fff", borderColor: "#d1d5db" }}>
+                  {on && (
+                    <svg viewBox="0 0 10 10" className="w-2.5 h-2.5" fill="none">
+                      <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </span>
+                <span className="text-xs text-gray-600">{cal.nome}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -796,6 +826,7 @@ export default function AgendaPage() {
           defaultDate={defaultDate}
           calendarios={calendarios}
           onSave={() => { closeModal(); load(); }}
+          onQuickSave={() => load()}
           onClose={closeModal}
           onDelete={modal === "editar" ? () => { load(); closeModal(); } : undefined}
         />

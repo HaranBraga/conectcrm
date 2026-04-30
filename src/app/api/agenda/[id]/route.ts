@@ -7,6 +7,7 @@ const include = {
   solicitante: { select: { id: true, name: true, phone: true, role: true } },
   demanda:     { select: { id: true, titulo: true, status: true } },
   anfitrioes:  { include: { contact: { select: { id: true, name: true, phone: true, role: true } } } },
+  calendario:  { select: { id: true, nome: true, cor: true } },
 };
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
@@ -21,7 +22,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     titulo, assunto, tipo, status, inicio, duracao,
     local, bairro, zona, quantidadePessoas, oQuePrecisa, notes,
     solicitanteId, solicitanteNome, solicitanteTel,
-    demandaId, anfitriaoIds,
+    demandaId, anfitriaoIds, calendarioId,
   } = body;
 
   // Replace anfitrioes if provided
@@ -48,12 +49,24 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       ...(solicitanteNome !== undefined && { solicitanteNome }),
       ...(solicitanteTel  !== undefined && { solicitanteTel }),
       ...(demandaId    !== undefined && { demandaId: demandaId || null }),
+      ...(calendarioId !== undefined && { calendarioId: calendarioId || null }),
       ...(anfitriaoIds !== undefined && {
         anfitrioes: {
           create: anfitriaoIds.map((id: string) => ({ contactId: id })),
         },
       }),
     },
+    include,
+  });
+  return NextResponse.json(evento);
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const body = await req.json();
+  const { status } = body;
+  const evento = await prisma.agendaEvento.update({
+    where: { id: params.id },
+    data: { ...(status !== undefined && { status }) },
     include,
   });
   return NextResponse.json(evento);
