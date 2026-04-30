@@ -496,7 +496,7 @@ function MonthView({ currentDate, events, calendarios, onDayClick, onEventClick 
 // ─── Week View ────────────────────────────────────────────────────────────────
 
 const GRID_COLS = "56px repeat(7, 1fr)";
-const N_SLOTS   = (END_HOUR - START_HOUR) * 2; // slots de 30 min
+const N_SLOTS   = (END_HOUR - START_HOUR) * 2;
 
 function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick }: {
   currentDate: Date; events: any[]; calendarios: any[];
@@ -508,53 +508,73 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
     return events.filter(e => isSameDay(new Date(e.inicio), day));
   }
 
-  return (
-    <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-4">
+  // Inline styles explícitos garantem comportamento de scroll independente de Tailwind
+  const outerStyle: React.CSSProperties = {
+    display: "flex", flexDirection: "column",
+    flex: 1, minHeight: 0, overflow: "hidden",
+    padding: "0 16px",
+  };
+  const scrollStyle: React.CSSProperties = {
+    flex: 1, overflowY: "scroll", minHeight: 0,
+  };
 
-      {/* Cabeçalho dos dias — mesmo grid-template que o corpo */}
-      <div className="grid shrink-0 border-b border-gray-100 bg-white"
-        style={{ gridTemplateColumns: GRID_COLS }}>
-        <div /> {/* espaço da coluna de horas */}
+  return (
+    <div style={outerStyle}>
+
+      {/* Cabeçalho — mesmo grid-template que o corpo → alinhamento perfeito */}
+      <div style={{ display: "grid", gridTemplateColumns: GRID_COLS, flexShrink: 0, borderBottom: "1px solid #f3f4f6", background: "white" }}>
+        <div style={{ width: 56 }} />
         {days.map((d, i) => (
-          <div key={i} className="text-center py-1.5 border-l border-gray-100">
-            <p className="text-[10px] font-medium text-gray-400 uppercase">{WEEKDAYS[d.getDay()]}</p>
-            <div className={`text-xs font-bold mx-auto w-6 h-6 flex items-center justify-center rounded-full
-              ${isToday(d) ? "bg-brand-600 text-white" : "text-gray-700"}`}>
+          <div key={i} style={{ textAlign: "center", padding: "6px 0", borderLeft: "1px solid #f3f4f6" }}>
+            <p style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", margin: 0 }}>{WEEKDAYS[d.getDay()]}</p>
+            <div style={{
+              fontSize: 12, fontWeight: 700,
+              width: 24, height: 24, borderRadius: "50%",
+              display: "flex", alignItems: "center", justifyContent: "center", margin: "2px auto 0",
+              background: isToday(d) ? "#4f46e5" : "transparent",
+              color: isToday(d) ? "white" : "#374151",
+            }}>
               {d.getDate()}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Grade horária (rolável) */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="grid" style={{ gridTemplateColumns: GRID_COLS, height: TOTAL_H }}>
+      {/* Grade horária rolável */}
+      <div style={scrollStyle}>
+        <div style={{ display: "grid", gridTemplateColumns: GRID_COLS, height: TOTAL_H }}>
 
-          {/* Coluna de rótulos de hora */}
-          <div style={{ position: "relative" }}>
+          {/* Rótulos de hora */}
+          <div style={{ position: "relative", width: 56 }}>
             {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
-              <div key={i} className="border-b border-gray-100 absolute w-full flex items-start justify-end pr-2"
-                style={{ top: i * HOUR_PX, height: HOUR_PX }}>
-                <span className="text-[10px] text-gray-400 -mt-2">{i + START_HOUR}:00</span>
+              <div key={i} style={{
+                position: "absolute", top: i * HOUR_PX, left: 0, right: 0, height: HOUR_PX,
+                borderBottom: "1px solid #f3f4f6",
+                display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 8,
+              }}>
+                <span style={{ fontSize: 10, color: "#9ca3af", marginTop: -6 }}>{i + START_HOUR}:00</span>
               </div>
             ))}
           </div>
 
           {/* Colunas de dias */}
           {days.map((day, di) => (
-            <div key={di} className="border-l border-gray-100 overflow-hidden"
-              style={{ position: "relative", height: TOTAL_H }}>
+            <div key={di} style={{ position: "relative", height: TOTAL_H, borderLeft: "1px solid #f3f4f6", overflow: "hidden" }}>
 
-              {/* Slots clicáveis de 30 min */}
+              {/* Slots de 30 min */}
               {Array.from({ length: N_SLOTS }, (_, idx) => {
-                const h = Math.floor(idx / 2) + START_HOUR;
-                const m = (idx % 2) * 30;
+                const h    = Math.floor(idx / 2) + START_HOUR;
+                const m    = (idx % 2) * 30;
                 const half = idx % 2 === 1;
                 return (
                   <div key={idx}
-                    className={`absolute w-full cursor-pointer hover:bg-indigo-50/30
-                      ${half ? "border-b border-gray-50" : "border-b border-gray-100"}`}
-                    style={{ top: idx * (HOUR_PX / 2), height: HOUR_PX / 2 }}
+                    style={{
+                      position: "absolute", top: idx * (HOUR_PX / 2), left: 0, right: 0, height: HOUR_PX / 2,
+                      borderBottom: `1px solid ${half ? "#f9fafb" : "#f3f4f6"}`,
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(99,102,241,0.04)")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "")}
                     onClick={() => { const d = new Date(day); d.setHours(h, m, 0, 0); onSlotClick(d); }}
                   />
                 );
@@ -572,17 +592,23 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
                 const bg  = cal ? `${col}22` : t.bg;
                 return (
                   <div key={ev.id} onClick={() => onEventClick(ev)}
-                    className="absolute rounded-md px-1.5 py-0.5 text-[11px] cursor-pointer overflow-hidden shadow-sm"
                     style={{
-                      top:    (minFrom / 60) * HOUR_PX,
+                      position: "absolute",
+                      top: (minFrom / 60) * HOUR_PX,
                       height: Math.max(22, (dur / 60) * HOUR_PX - 2),
-                      left: 2, right: 2,
+                      left: 3, right: 3,
                       zIndex: 10,
                       backgroundColor: bg, color: col,
                       borderLeft: `3px solid ${col}`,
+                      borderRadius: 6,
+                      padding: "2px 6px",
+                      fontSize: 11,
+                      cursor: "pointer",
+                      overflow: "hidden",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
                     }}>
-                    <p className="font-semibold truncate leading-tight">{ev.titulo}</p>
-                    <p className="opacity-70 leading-none">{format(start, "HH:mm")}</p>
+                    <p style={{ fontWeight: 600, margin: 0, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", lineHeight: 1.3 }}>{ev.titulo}</p>
+                    <p style={{ margin: 0, opacity: 0.7, lineHeight: 1 }}>{format(start, "HH:mm")}</p>
                   </div>
                 );
               })}
@@ -825,8 +851,8 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      {/* Calendar content */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      {/* Calendar content — min-h-0 essencial para o scroll interno funcionar */}
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         {loading ? (
           <div className="flex justify-center items-center flex-1">
             <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
@@ -848,7 +874,7 @@ export default function AgendaPage() {
           defaultDate={defaultDate}
           calendarios={calendarios}
           onSave={() => { closeModal(); load(); }}
-          onQuickSave={() => load()}
+          onQuickSave={() => load(true)}
           onClose={closeModal}
           onDelete={modal === "editar" ? () => { load(); closeModal(); } : undefined}
         />
