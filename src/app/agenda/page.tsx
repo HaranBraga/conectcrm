@@ -502,64 +502,66 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
   currentDate: Date; events: any[]; calendarios: any[];
   onEventClick: (e: any) => void; onSlotClick: (d: Date) => void;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dayHeaderRef  = useRef<HTMLDivElement>(null);
+  const [scrollH, setScrollH] = useState(500);
+
+  // ResizeObserver: mede altura disponível e seta pixels explícitos no body
+  useEffect(() => {
+    const measure = () => {
+      if (!containerRef.current || !dayHeaderRef.current) return;
+      const total  = containerRef.current.clientHeight;
+      const hdrH   = dayHeaderRef.current.offsetHeight;
+      setScrollH(Math.max(100, total - hdrH));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
   const days = getWeekDays(currentDate);
 
   function eventsForDay(day: Date) {
     return events.filter(e => isSameDay(new Date(e.inicio), day));
   }
 
-  // Inline styles explícitos garantem comportamento de scroll independente de Tailwind
-  const outerStyle: React.CSSProperties = {
-    display: "flex", flexDirection: "column",
-    flex: 1, minHeight: 0, overflow: "hidden",
-    padding: "0 16px",
-  };
-  const scrollStyle: React.CSSProperties = {
-    flex: 1, overflowY: "scroll", minHeight: 0,
-  };
-
   return (
-    <div style={outerStyle}>
+    <div ref={containerRef} className="flex flex-col flex-1 overflow-hidden px-4">
 
-      {/* Cabeçalho — mesmo grid-template que o corpo → alinhamento perfeito */}
-      <div style={{ display: "grid", gridTemplateColumns: GRID_COLS, flexShrink: 0, borderBottom: "1px solid #f3f4f6", background: "white" }}>
-        <div style={{ width: 56 }} />
+      {/* Cabeçalho dos dias — mesmo grid-template que o corpo */}
+      <div ref={dayHeaderRef} className="grid shrink-0 border-b border-gray-100 bg-white"
+        style={{ gridTemplateColumns: GRID_COLS }}>
+        <div className="w-14" />
         {days.map((d, i) => (
-          <div key={i} style={{ textAlign: "center", padding: "6px 0", borderLeft: "1px solid #f3f4f6" }}>
-            <p style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", margin: 0 }}>{WEEKDAYS[d.getDay()]}</p>
-            <div style={{
-              fontSize: 12, fontWeight: 700,
-              width: 24, height: 24, borderRadius: "50%",
-              display: "flex", alignItems: "center", justifyContent: "center", margin: "2px auto 0",
-              background: isToday(d) ? "#4f46e5" : "transparent",
-              color: isToday(d) ? "white" : "#374151",
-            }}>
+          <div key={i} className="text-center py-1.5 border-l border-gray-100">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase">{WEEKDAYS[d.getDay()]}</p>
+            <div className={`text-xs font-bold mx-auto w-6 h-6 flex items-center justify-center rounded-full
+              ${isToday(d) ? "bg-brand-600 text-white" : "text-gray-700"}`}>
               {d.getDate()}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Grade horária rolável */}
-      <div style={scrollStyle}>
-        <div style={{ display: "grid", gridTemplateColumns: GRID_COLS, height: TOTAL_H }}>
+      {/* Grade horária — altura em pixels explícitos garantidos pelo ResizeObserver */}
+      <div style={{ height: scrollH, overflowY: "scroll" }}>
+        <div className="grid" style={{ gridTemplateColumns: GRID_COLS, height: TOTAL_H }}>
 
           {/* Rótulos de hora */}
-          <div style={{ position: "relative", width: 56 }}>
+          <div className="relative w-14">
             {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
-              <div key={i} style={{
-                position: "absolute", top: i * HOUR_PX, left: 0, right: 0, height: HOUR_PX,
-                borderBottom: "1px solid #f3f4f6",
-                display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 8,
-              }}>
-                <span style={{ fontSize: 10, color: "#9ca3af", marginTop: -6 }}>{i + START_HOUR}:00</span>
+              <div key={i} className="absolute w-full border-b border-gray-100 flex items-start justify-end pr-2"
+                style={{ top: i * HOUR_PX, height: HOUR_PX }}>
+                <span className="text-[10px] text-gray-400" style={{ marginTop: -8 }}>{i + START_HOUR}:00</span>
               </div>
             ))}
           </div>
 
           {/* Colunas de dias */}
           {days.map((day, di) => (
-            <div key={di} style={{ position: "relative", height: TOTAL_H, borderLeft: "1px solid #f3f4f6", overflow: "hidden" }}>
+            <div key={di} className="relative border-l border-gray-100 overflow-hidden"
+              style={{ height: TOTAL_H }}>
 
               {/* Slots de 30 min */}
               {Array.from({ length: N_SLOTS }, (_, idx) => {
@@ -568,13 +570,8 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
                 const half = idx % 2 === 1;
                 return (
                   <div key={idx}
-                    style={{
-                      position: "absolute", top: idx * (HOUR_PX / 2), left: 0, right: 0, height: HOUR_PX / 2,
-                      borderBottom: `1px solid ${half ? "#f9fafb" : "#f3f4f6"}`,
-                      cursor: "pointer",
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(99,102,241,0.04)")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "")}
+                    className={`absolute w-full cursor-pointer hover:bg-indigo-50/30 ${half ? "border-b border-gray-50" : "border-b border-gray-100"}`}
+                    style={{ top: idx * (HOUR_PX / 2), height: HOUR_PX / 2 }}
                     onClick={() => { const d = new Date(day); d.setHours(h, m, 0, 0); onSlotClick(d); }}
                   />
                 );
@@ -592,23 +589,16 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
                 const bg  = cal ? `${col}22` : t.bg;
                 return (
                   <div key={ev.id} onClick={() => onEventClick(ev)}
+                    className="absolute rounded-md px-1.5 py-0.5 text-[11px] cursor-pointer overflow-hidden shadow-sm"
                     style={{
-                      position: "absolute",
-                      top: (minFrom / 60) * HOUR_PX,
+                      top:    (minFrom / 60) * HOUR_PX,
                       height: Math.max(22, (dur / 60) * HOUR_PX - 2),
-                      left: 3, right: 3,
-                      zIndex: 10,
+                      left: 3, right: 3, zIndex: 10,
                       backgroundColor: bg, color: col,
                       borderLeft: `3px solid ${col}`,
-                      borderRadius: 6,
-                      padding: "2px 6px",
-                      fontSize: 11,
-                      cursor: "pointer",
-                      overflow: "hidden",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
                     }}>
-                    <p style={{ fontWeight: 600, margin: 0, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", lineHeight: 1.3 }}>{ev.titulo}</p>
-                    <p style={{ margin: 0, opacity: 0.7, lineHeight: 1 }}>{format(start, "HH:mm")}</p>
+                    <p className="font-semibold truncate leading-tight">{ev.titulo}</p>
+                    <p className="opacity-70 leading-none">{format(start, "HH:mm")}</p>
                   </div>
                 );
               })}
@@ -796,21 +786,28 @@ export default function AgendaPage() {
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 shrink-0">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Agenda</h1>
-          <p className="text-sm text-gray-500">{events.length} evento{events.length !== 1 ? "s" : ""} no período</p>
-        </div>
-        <button onClick={() => openNew()}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          <Plus size={16} /> Nova Agenda
-        </button>
-      </header>
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-6 py-2 bg-white border-b border-gray-100 shrink-0">
-        <div className="flex items-center gap-2">
+      {/* Header único — padrão igual demandas/reuniões/kanban */}
+      <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 shrink-0 gap-4">
+        {/* Título + navegação */}
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Agenda</h1>
+            <p className="text-sm text-gray-500 capitalize">{dateLabel}</p>
+          </div>
+          <div className="flex items-center gap-1 ml-2">
+            <button onClick={() => setRefDate(navigate(view, refDate, -1))}
+              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><ChevronLeft size={15} /></button>
+            <button onClick={() => setRefDate(new Date())}
+              className="text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 font-medium">Hoje</button>
+            <button onClick={() => setRefDate(navigate(view, refDate, 1))}
+              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><ChevronRight size={15} /></button>
+          </div>
+        </div>
+
+        {/* Controles centrais + direita */}
+        <div className="flex items-center gap-4 flex-1 justify-end">
+          {/* Visualizações */}
           <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
             {VIEWS.map(({ key, label, icon: Icon }) => (
               <button key={key} onClick={() => setView(key as ViewType)}
@@ -819,39 +816,37 @@ export default function AgendaPage() {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-1">
-            <button onClick={() => setRefDate(navigate(view, refDate, -1))}
-              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><ChevronLeft size={15} /></button>
-            <button onClick={() => setRefDate(new Date())}
-              className="text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 font-medium">Hoje</button>
-            <button onClick={() => setRefDate(navigate(view, refDate, 1))}
-              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><ChevronRight size={15} /></button>
-          </div>
-          <span className="text-sm font-semibold text-gray-700 capitalize">{dateLabel}</span>
-        </div>
-        {/* Calendários – filtro rápido */}
-        <div className="flex items-center gap-3">
-          {calendarios.map(cal => {
-            const on = selectedCals.includes(cal.id);
-            return (
-              <button key={cal.id} type="button" onClick={() => toggleCal(cal.id)}
-                className="flex items-center gap-1.5 cursor-pointer select-none">
-                <span className="w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all"
-                  style={on ? { backgroundColor: cal.cor, borderColor: cal.cor } : { backgroundColor: "#fff", borderColor: "#d1d5db" }}>
-                  {on && (
-                    <svg viewBox="0 0 10 10" className="w-2.5 h-2.5" fill="none">
-                      <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  )}
-                </span>
-                <span className="text-xs text-gray-600">{cal.nome}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
-      {/* Calendar content — min-h-0 essencial para o scroll interno funcionar */}
+          {/* Filtro de calendários */}
+          <div className="flex items-center gap-3">
+            {calendarios.map(cal => {
+              const on = selectedCals.includes(cal.id);
+              return (
+                <button key={cal.id} type="button" onClick={() => toggleCal(cal.id)}
+                  className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <span className="w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all"
+                    style={on ? { backgroundColor: cal.cor, borderColor: cal.cor } : { backgroundColor: "#fff", borderColor: "#d1d5db" }}>
+                    {on && (
+                      <svg viewBox="0 0 10 10" className="w-2.5 h-2.5" fill="none">
+                        <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </span>
+                  <span className="text-xs text-gray-600">{cal.nome}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Nova Agenda */}
+          <button onClick={() => openNew()}
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium shrink-0">
+            <Plus size={16} /> Nova Agenda
+          </button>
+        </div>
+      </header>
+
+      {/* Conteúdo */}
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         {loading ? (
           <div className="flex justify-center items-center flex-1">
