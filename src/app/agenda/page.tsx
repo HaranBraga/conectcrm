@@ -716,13 +716,13 @@ export default function AgendaPage() {
     });
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const { start, end } = getDateRange(view, refDate);
       const r = await fetch(`/api/agenda?start=${start.toISOString()}&end=${end.toISOString()}`);
       setAllEvents(await r.json());
-    } finally { setLoading(false); }
+    } finally { if (!silent) setLoading(false); }
   }, [view, refDate]);
 
   useEffect(() => { load(); }, [load]);
@@ -730,7 +730,7 @@ export default function AgendaPage() {
   // SSE: recarrega quando outro usuário cria/edita/deleta evento
   useEffect(() => {
     const es = new EventSource("/api/sse");
-    es.addEventListener("agenda", () => load());
+    es.addEventListener("agenda", () => load(true));
     return () => es.close();
   }, [load]);
 

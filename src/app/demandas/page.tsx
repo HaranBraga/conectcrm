@@ -549,8 +549,8 @@ export default function DemandasPage() {
     }
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const p = new URLSearchParams();
       if (showArq)    p.set("arquivadas", "true");
@@ -563,15 +563,15 @@ export default function DemandasPage() {
       }
       const r = await fetch(`/api/demandas?${p}`);
       setDemandas(await r.json());
-    } finally { setLoading(false); }
+    } finally { if (!silent) setLoading(false); }
   }, [view, showArq, search, filterSeg, filterPrio]);
 
   useEffect(() => { load(); }, [load]);
 
-  // SSE: recarrega quando outro usuário muta demandas
+  // SSE: recarrega silenciosamente quando outro usuário muta demandas (sem spinner)
   useEffect(() => {
     const es = new EventSource("/api/sse");
-    es.addEventListener("demandas", () => load());
+    es.addEventListener("demandas", () => load(true));
     return () => es.close();
   }, [load]);
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { broadcast } from "@/lib/sse";
 
 // Formatos reais de número BR:
 //   55 + DDD(2) + 8 local (SEM 9º) = 12 dígitos  ← formato antigo
@@ -197,6 +198,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    broadcast("kanban", { action: "message" });
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("Webhook error:", e);
