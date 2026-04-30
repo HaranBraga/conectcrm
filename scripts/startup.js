@@ -88,11 +88,27 @@ async function seedDemandaConfig() {
   console.log("✅ Demanda config: status, prioridades e segmentos verificados");
 }
 
+async function seedCalendarios() {
+  const count = await prisma.agendaCalendario.count();
+  if (count === 0) {
+    await prisma.agendaCalendario.createMany({
+      data: [
+        { nome: "Agenda Política", cor: "#6366f1", isPadrao: true },
+        { nome: "Pessoal",         cor: "#10b981", isPadrao: false },
+      ],
+    });
+    console.log("✅ Calendários: 2 calendários padrão criados");
+  } else {
+    console.log(`✅ Calendários: ${count} calendários já existem`);
+  }
+}
+
 async function main() {
   await seedRoles();
   await seedKanban();
   await seedLabels();
   await seedDemandaConfig();
+  await seedCalendarios();
 }
 
 main()

@@ -293,6 +293,48 @@ function DemandaPrioSection({ cfg, onChange }: { cfg: any; onChange: (patch: any
   );
 }
 
+function CalendarioForm({ initial, onSave, onClose }: any) {
+  const [nome, setNome] = useState(initial?.nome ?? "");
+  const [cor,  setCor]  = useState(initial?.cor  ?? "#6366f1");
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); setSaving(true);
+    try {
+      const method = initial?.id ? "PUT" : "POST";
+      const url    = initial?.id ? `/api/agenda/calendarios/${initial.id}` : "/api/agenda/calendarios";
+      const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome, cor }) });
+      if (!r.ok) { const d = await r.json(); toast.error(d.error ?? "Erro"); return; }
+      toast.success("Calendário salvo!"); onSave();
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+        <input required value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Agenda Política"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Cor</label>
+        <ColorPicker value={cor} onChange={setCor} />
+      </div>
+      <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+        <span className="text-sm text-gray-500">Prévia:</span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: cor }} />
+          <span className="text-sm font-medium text-gray-800">{nome || "Calendário"}</span>
+        </span>
+      </div>
+      <div className="flex justify-end gap-3 pt-2">
+        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+        <button disabled={saving} className="px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 rounded-lg font-medium">{saving ? "Salvando..." : "Salvar"}</button>
+      </div>
+    </form>
+  );
+}
+
 function DemandaSegmentoSection({ cfg, onChange }: { cfg: any; onChange: (patch: any) => void }) {
   const [newSeg, setNewSeg] = useState("");
   const [editIdx, setEditIdx] = useState<number | null>(null);
@@ -336,15 +378,17 @@ function DemandaSegmentoSection({ cfg, onChange }: { cfg: any; onChange: (patch:
 }
 
 export default function ConfiguracoesPage() {
-  const [statuses, setStatuses]     = useState<any[]>([]);
-  const [roles, setRoles]           = useState<PersonRole[]>([]);
-  const [labels, setLabels]         = useState<any[]>([]);
-  const [demandaCfg, setDemandaCfg] = useState<any>({ statuses: [], prioridades: [], segmentos: [] });
-  const [savingCfg, setSavingCfg]   = useState(false);
-  const [modal, setModal]           = useState<"newStatus" | "editStatus" | "editRole" | "newLabel" | "editLabel" | null>(null);
+  const [statuses, setStatuses]           = useState<any[]>([]);
+  const [roles, setRoles]                 = useState<PersonRole[]>([]);
+  const [labels, setLabels]               = useState<any[]>([]);
+  const [calendarios, setCalendarios]     = useState<any[]>([]);
+  const [demandaCfg, setDemandaCfg]       = useState<any>({ statuses: [], prioridades: [], segmentos: [] });
+  const [savingCfg, setSavingCfg]         = useState(false);
+  const [modal, setModal]                 = useState<"newStatus" | "editStatus" | "editRole" | "newLabel" | "editLabel" | "newCal" | "editCal" | null>(null);
   const [editingStatus, setEditingStatus] = useState<any | null>(null);
   const [editingRole, setEditingRole]     = useState<PersonRole | null>(null);
   const [editingLabel, setEditingLabel]   = useState<any | null>(null);
+  const [editingCal, setEditingCal]       = useState<any | null>(null);
 
   const loadStatuses = useCallback(async () => {
     const r = await fetch("/api/kanban");
@@ -366,7 +410,12 @@ export default function ConfiguracoesPage() {
     setDemandaCfg(await r.json());
   }, []);
 
-  useEffect(() => { loadStatuses(); loadRoles(); loadLabels(); loadDemandaCfg(); }, [loadStatuses, loadRoles, loadLabels, loadDemandaCfg]);
+  const loadCalendarios = useCallback(async () => {
+    const r = await fetch("/api/agenda/calendarios");
+    setCalendarios(await r.json());
+  }, []);
+
+  useEffect(() => { loadStatuses(); loadRoles(); loadLabels(); loadDemandaCfg(); loadCalendarios(); }, [loadStatuses, loadRoles, loadLabels, loadDemandaCfg, loadCalendarios]);
 
   async function saveDemandaCfg(patch: any) {
     const updated = { statuses: demandaCfg.statuses, prioridades: demandaCfg.prioridades, segmentos: demandaCfg.segmentos, ...patch };
@@ -401,6 +450,12 @@ export default function ConfiguracoesPage() {
   async function delLabel(id: string, name: string) {
     await fetch(`/api/labels/${id}`, { method: "DELETE" });
     toast.success(`"${name}" removida`); loadLabels();
+  }
+
+  async function delCalendario(id: string, nome: string) {
+    const r = await fetch(`/api/agenda/calendarios/${id}`, { method: "DELETE" });
+    if (!r.ok) { const d = await r.json(); toast.error(d.error); return; }
+    toast.success(`"${nome}" removido`); loadCalendarios();
   }
 
   return (
@@ -517,6 +572,38 @@ export default function ConfiguracoesPage() {
           </div>
         </section>
 
+        {/* Calendários */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-semibold text-gray-900">Calendários da Agenda</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Crie e personalize os calendários exibidos na Agenda</p>
+            </div>
+            <button onClick={() => { setEditingCal(null); setModal("newCal"); }}
+              className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+              <Plus size={15} /> Novo calendário
+            </button>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+            {calendarios.length === 0 && (
+              <div className="py-10 text-center text-gray-400 text-sm">Nenhum calendário criado.</div>
+            )}
+            {calendarios.map((c) => (
+              <div key={c.id} className="flex items-center gap-4 px-4 py-3 group">
+                <span className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: c.cor }} />
+                <span className="flex-1 font-medium text-sm text-gray-800">{c.nome}</span>
+                {c.isPadrao && <span className="text-xs bg-brand-50 text-brand-600 px-2 py-0.5 rounded-full font-medium">Padrão</span>}
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => { setEditingCal(c); setModal("editCal"); }} className="p-1.5 hover:bg-gray-100 rounded text-gray-500"><Edit2 size={14} /></button>
+                  {!c.isPadrao && (
+                    <button onClick={() => delCalendario(c.id, c.nome)} className="p-1.5 hover:bg-red-100 rounded text-red-400"><Trash2 size={14} /></button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
       </div>
 
       <Modal open={modal === "newStatus"} onClose={() => setModal(null)} title="Nova Coluna" size="sm">
@@ -533,6 +620,12 @@ export default function ConfiguracoesPage() {
       </Modal>
       <Modal open={modal === "editLabel"} onClose={() => setModal(null)} title="Editar Etiqueta" size="sm">
         <LabelForm initial={editingLabel} onSave={() => { setModal(null); loadLabels(); }} onClose={() => setModal(null)} />
+      </Modal>
+      <Modal open={modal === "newCal"} onClose={() => setModal(null)} title="Novo Calendário" size="sm">
+        <CalendarioForm onSave={() => { setModal(null); loadCalendarios(); }} onClose={() => setModal(null)} />
+      </Modal>
+      <Modal open={modal === "editCal"} onClose={() => setModal(null)} title="Editar Calendário" size="sm">
+        <CalendarioForm initial={editingCal} onSave={() => { setModal(null); loadCalendarios(); }} onClose={() => setModal(null)} />
       </Modal>
     </div>
   );

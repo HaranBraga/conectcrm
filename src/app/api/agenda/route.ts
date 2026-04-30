@@ -7,17 +7,18 @@ const include = {
   solicitante: { select: { id: true, name: true, phone: true, role: true } },
   demanda:     { select: { id: true, titulo: true, status: true } },
   anfitrioes:  { include: { contact: { select: { id: true, name: true, phone: true, role: true } } } },
+  calendario:  { select: { id: true, nome: true, cor: true } },
 };
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const start = searchParams.get("start");
-  const end   = searchParams.get("end");
+  const start       = searchParams.get("start");
+  const end         = searchParams.get("end");
+  const calIds      = searchParams.getAll("cal");
 
   const where: any = {};
-  if (start && end) {
-    where.inicio = { gte: new Date(start), lte: new Date(end) };
-  }
+  if (start && end) where.inicio = { gte: new Date(start), lte: new Date(end) };
+  if (calIds.length > 0) where.calendarioId = { in: calIds };
 
   const eventos = await prisma.agendaEvento.findMany({
     where, include,
@@ -47,7 +48,8 @@ export async function POST(req: NextRequest) {
       solicitanteId: solicitanteId || null,
       solicitanteNome: solicitanteNome || null,
       solicitanteTel: solicitanteTel || null,
-      demandaId: demandaId || null,
+      demandaId:    demandaId    || null,
+      calendarioId: body.calendarioId || null,
       anfitrioes: {
         create: anfitriaoIds.map((id: string) => ({ contactId: id })),
       },

@@ -194,6 +194,15 @@ model Demanda {
   @@index([arquivadaEm])
 }
 
+model AgendaCalendario {
+  id        String         @id @default(cuid())
+  nome      String
+  cor       String         @default("#6366f1")
+  isPadrao  Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  eventos   AgendaEvento[]
+}
+
 model AgendaEvento {
   id                String  @id @default(cuid())
   titulo            String
@@ -214,8 +223,10 @@ model AgendaEvento {
   solicitanteNome String?
   solicitanteTel  String?
 
-  demandaId String?
-  demanda   Demanda? @relation(fields: [demandaId], references: [id])
+  demandaId    String?
+  demanda      Demanda?          @relation(fields: [demandaId], references: [id])
+  calendarioId String?
+  calendario   AgendaCalendario? @relation(fields: [calendarioId], references: [id])
 
   anfitrioes AgendaAnfitriao[]
 
@@ -225,6 +236,7 @@ model AgendaEvento {
   @@index([inicio])
   @@index([tipo])
   @@index([status])
+  @@index([calendarioId])
 }
 
 model AgendaAnfitriao {

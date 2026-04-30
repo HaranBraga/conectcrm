@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ChevronLeft, ChevronRight, Plus, CalendarDays, List,
   LayoutGrid, Clock, MapPin, Users, X, Trash2,
-  User, Home, FileText,
+  Home, FileText, Edit2,
 } from "lucide-react";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { Modal } from "@/components/ui/Modal";
@@ -13,9 +13,9 @@ import toast from "react-hot-toast";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const TIPOS: Record<string, { label: string; color: string; bg: string; light: string }> = {
-  AGENDA:  { label: "Agenda",  color: "#4f46e5", bg: "#eef2ff", light: "#c7d2fe" },
-  REUNIAO: { label: "Reunião", color: "#059669", bg: "#ecfdf5", light: "#a7f3d0" },
+const TIPOS: Record<string, { label: string; color: string; bg: string }> = {
+  AGENDA:  { label: "Agenda",  color: "#4f46e5", bg: "#eef2ff" },
+  REUNIAO: { label: "Reunião", color: "#059669", bg: "#ecfdf5" },
 };
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
@@ -29,8 +29,13 @@ const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const START_HOUR = 7;
 const END_HOUR   = 21;
 const HOUR_PX    = 48;
+const TOTAL_H    = HOUR_PX * (END_HOUR - START_HOUR);
 
-// ─── Date helpers ─────────────────────────────────────────────────────────────
+// ─── Helpers de data ──────────────────────────────────────────────────────────
+
+function isSameMonth(d: Date, ref: Date) {
+  return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth();
+}
 
 function getMonthGrid(year: number, month: number): Date[] {
   const first = new Date(year, month, 1);
@@ -45,7 +50,7 @@ function getMonthGrid(year: number, month: number): Date[] {
 
 function getWeekDays(ref: Date): Date[] {
   const d = new Date(ref);
-  d.setDate(d.getDate() - d.getDay()); // Sunday start
+  d.setDate(d.getDate() - d.getDay());
   return Array.from({ length: 7 }, (_, i) => {
     const wd = new Date(d);
     wd.setDate(d.getDate() + i);
@@ -53,8 +58,11 @@ function getWeekDays(ref: Date): Date[] {
   });
 }
 
-function isSameMonth(d: Date, ref: Date): boolean {
-  return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth();
+// Converte ISO UTC para string local (para datetime-local input)
+function isoToLocal(iso: string): string {
+  const d = new Date(iso);
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
 }
 
 // ─── ContactSearch ────────────────────────────────────────────────────────────
@@ -116,17 +124,20 @@ function ContactSearch({ placeholder = "Buscar contato...", onSelect }: {
 
 const INP = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500";
 
-function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
-  initial?: any; defaultDate?: Date;
+function EventForm({ initial, defaultDate, calendarios, onSave, onClose, onDelete }: {
+  initial?: any; defaultDate?: Date; calendarios: any[];
   onSave: (e: any) => void; onClose: () => void; onDelete?: () => void;
 }) {
   const [tipo,       setTipo]       = useState(initial?.tipo      ?? "AGENDA");
   const [titulo,     setTitulo]     = useState(initial?.titulo     ?? "");
   const [assunto,    setAssunto]    = useState(initial?.assunto    ?? "");
   const [status,     setStatus]     = useState(initial?.status     ?? "PENDENTE");
+  const [calendarioId, setCalendarioId] = useState(
+    initial?.calendarioId ?? calendarios.find(c => c.isPadrao)?.id ?? ""
+  );
   const [inicio,     setInicio]     = useState(
-    initial?.inicio ? initial.inicio.slice(0, 16)
-    : defaultDate   ? format(defaultDate, "yyyy-MM-dd'T'08:00")
+    initial?.inicio   ? isoToLocal(initial.inicio)
+    : defaultDate     ? format(defaultDate, "yyyy-MM-dd'T'08:00")
     : format(new Date(), "yyyy-MM-dd'T'08:00")
   );
   const [duracao,    setDuracao]    = useState(String(initial?.duracao  ?? 60));
@@ -137,40 +148,59 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
   const [oQuePrecisa, setOQuePrecisa] = useState(initial?.oQuePrecisa ?? "");
   const [notes,      setNotes]      = useState(initial?.notes      ?? "");
 
-  // Solicitante
-  const [solicitanteMode, setSolicitanteMode] = useState<"base" | "manual">(initial?.solicitanteId ? "base" : "manual");
+  const [solicitanteMode, setSolicitanteMode] = useState<"base" | "manual">(
+    initial?.solicitanteId ? "base" : "manual"
+  );
   const [solicitante,  setSolicitante]  = useState<any | null>(initial?.solicitante ?? null);
   const [solNome,      setSolNome]      = useState(initial?.solicitanteNome ?? "");
   const [solTel,       setSolTel]       = useState(initial?.solicitanteTel  ?? "");
 
-  // Anfitriões (REUNIAO)
-  const [anfitrioes, setAnfitrioes] = useState<any[]>(
+  const [anfitrioes,   setAnfitrioes]   = useState<any[]>(
     initial?.anfitrioes?.map((a: any) => a.contact) ?? []
   );
-
-  // Demanda vinculada (puxa do anfitrião)
-  const [demandas, setDemandas]   = useState<any[]>([]);
-  const [demandaId, setDemandaId] = useState(initial?.demandaId ?? "");
+  const [demandas,     setDemandas]     = useState<any[]>([]);
+  const [demandaId,    setDemandaId]    = useState(initial?.demandaId ?? "");
 
   const [saving,   setSaving]   = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Busca demandas dos anfitriões selecionados
+  const anfIds = anfitrioes.map(a => a.id).join(",");
   useEffect(() => {
-    if (anfitrioes.length === 0) { setDemandas([]); return; }
+    if (!anfIds) { setDemandas([]); return; }
     Promise.all(anfitrioes.map(a =>
       fetch(`/api/demandas?solicitanteId=${a.id}`).then(r => r.json())
-    )).then(results => setDemandas(results.flat()));
-  }, [anfitrioes.map(a => a.id).join(",")]);
+    )).then(res => setDemandas(res.flat()));
+  }, [anfIds]);
 
   function addAnfitriao(c: any) {
     if (!anfitrioes.find(a => a.id === c.id)) setAnfitrioes(prev => [...prev, c]);
   }
-  function removeAnfitriao(id: string) { setAnfitrioes(prev => prev.filter(a => a.id !== id)); }
+
+  async function checkConflicts(): Promise<any[]> {
+    const startMs = new Date(inicio).getTime();
+    const dur     = duracao ? parseInt(duracao) : 60;
+    const endMs   = startMs + dur * 60000;
+    const pad     = 4 * 3600000;
+    const r = await fetch(`/api/agenda?start=${new Date(startMs - pad).toISOString()}&end=${new Date(endMs + pad).toISOString()}`);
+    const all: any[] = await r.json();
+    return all.filter(ev => {
+      if (initial?.id && ev.id === initial.id) return false;
+      const evStart = new Date(ev.inicio).getTime();
+      const evEnd   = evStart + (ev.duracao ?? 60) * 60000;
+      return startMs < evEnd && endMs > evStart;
+    });
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!titulo.trim()) { toast.error("Título obrigatório"); return; }
+
+    const conflicts = await checkConflicts();
+    if (conflicts.length > 0) {
+      const nomes = conflicts.map(c => `• ${c.titulo} (${format(new Date(c.inicio), "HH:mm", { locale: ptBR })})`).join("\n");
+      if (!confirm(`Conflito com ${conflicts.length} evento(s) no mesmo horário:\n${nomes}\n\nDeseja salvar mesmo assim?`)) return;
+    }
+
     setSaving(true);
     try {
       const method = initial?.id ? "PUT" : "POST";
@@ -178,11 +208,13 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
       const r = await fetch(url, {
         method, headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          titulo, assunto, tipo, status, inicio,
+          titulo, assunto, tipo, status,
+          inicio, // datetime-local value — browser interprets as local, serializes to UTC
           duracao: duracao ? parseInt(duracao) : null,
           local, bairro, zona,
           quantidadePessoas: qtdPessoas ? parseInt(qtdPessoas) : null,
           oQuePrecisa, notes,
+          calendarioId: calendarioId || null,
           solicitanteId:   solicitanteMode === "base" ? solicitante?.id ?? null : null,
           solicitanteNome: solicitanteMode === "manual" ? solNome || null : null,
           solicitanteTel:  solicitanteMode === "manual" ? solTel  || null : null,
@@ -191,7 +223,7 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
         }),
       });
       if (!r.ok) { toast.error("Erro ao salvar"); return; }
-      toast.success(initial?.id ? "Agenda atualizada!" : "Agenda criada!");
+      toast.success(initial?.id ? "Evento atualizado!" : "Evento criado!");
       onSave(await r.json());
     } finally { setSaving(false); }
   }
@@ -208,14 +240,14 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
   const tipoColor = TIPOS[tipo]?.color ?? "#6366f1";
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-5">
+    <form onSubmit={submit} className="flex flex-col gap-4">
 
-      {/* Tipo toggle */}
+      {/* Tipo */}
       <div className="flex gap-2">
         {Object.entries(TIPOS).map(([key, cfg]) => (
           <button key={key} type="button" onClick={() => setTipo(key)}
             className={`flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${tipo === key ? "text-white border-transparent" : "bg-white border-gray-200 text-gray-500"}`}
-            style={tipo === key ? { backgroundColor: cfg.color, borderColor: cfg.color } : {}}>
+            style={tipo === key ? { backgroundColor: cfg.color } : {}}>
             {cfg.label}
           </button>
         ))}
@@ -232,10 +264,21 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
         ))}
       </div>
 
+      {/* Calendário */}
+      {calendarios.length > 0 && (
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Calendário</label>
+          <select value={calendarioId} onChange={e => setCalendarioId(e.target.value)} className={`${INP} bg-white`}>
+            <option value="">Sem calendário</option>
+            {calendarios.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          </select>
+        </div>
+      )}
+
       {/* Título + Assunto */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
         <input required value={titulo} onChange={e => setTitulo(e.target.value)}
-          placeholder="Título do evento *" className={`${INP} text-base font-medium`} />
+          placeholder="Título do evento *" className={INP} />
         <textarea value={assunto} onChange={e => setAssunto(e.target.value)} rows={2}
           placeholder="Assunto / descrição..." className={`${INP} resize-none`} />
       </div>
@@ -243,18 +286,13 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
       {/* Quando */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1"><Clock size={11} className="inline mr-1" />Início</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1"><Clock size={11} className="inline mr-1" />Início (horário local)</label>
           <input type="datetime-local" value={inicio} onChange={e => setInicio(e.target.value)} className={INP} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Duração (min)</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Duração</label>
           <select value={duracao} onChange={e => setDuracao(e.target.value)} className={`${INP} bg-white`}>
-            <option value="30">30 min</option>
-            <option value="60">1 hora</option>
-            <option value="90">1h30</option>
-            <option value="120">2 horas</option>
-            <option value="180">3 horas</option>
-            <option value="240">4 horas</option>
+            {[30,60,90,120,180,240].map(m => <option key={m} value={m}>{m < 60 ? `${m}min` : `${m/60}h${m%60?`${m%60}m`:""}`}</option>)}
           </select>
         </div>
       </div>
@@ -263,7 +301,7 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
       <div className="grid grid-cols-3 gap-3">
         <div className="col-span-3">
           <label className="block text-xs font-medium text-gray-500 mb-1"><MapPin size={11} className="inline mr-1" />Local</label>
-          <input value={local} onChange={e => setLocal(e.target.value)} placeholder="Endereço ou nome do local" className={INP} />
+          <input value={local} onChange={e => setLocal(e.target.value)} placeholder="Endereço ou nome" className={INP} />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Bairro</label>
@@ -278,7 +316,7 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1"><Users size={11} className="inline mr-1" />Qtd. pessoas</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1"><Users size={11} className="inline mr-1" />Pessoas</label>
           <input type="number" min="1" value={qtdPessoas} onChange={e => setQtdPessoas(e.target.value)} placeholder="0" className={INP} />
         </div>
       </div>
@@ -290,7 +328,7 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
           <div className="flex gap-1">
             {(["base", "manual"] as const).map(m => (
               <button key={m} type="button" onClick={() => setSolicitanteMode(m)}
-                className={`text-xs px-2 py-0.5 rounded-full border ${solicitanteMode === m ? "bg-indigo-600 text-white border-transparent" : "text-gray-500 border-gray-200"}`}>
+                className={`text-xs px-2 py-0.5 rounded-full border ${solicitanteMode === m ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200"}`}>
                 {m === "base" ? "Na base" : "Não cadastrado"}
               </button>
             ))}
@@ -306,7 +344,7 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
               {solicitante.role && <RoleBadge role={solicitante.role} />}
               <button type="button" onClick={() => setSolicitante(null)} className="text-indigo-300 hover:text-red-400"><X size={13} /></button>
             </div>
-          ) : <ContactSearch placeholder="Buscar solicitante na base..." onSelect={setSolicitante} />
+          ) : <ContactSearch placeholder="Buscar na base..." onSelect={setSolicitante} />
         ) : (
           <div className="grid grid-cols-2 gap-2">
             <input value={solNome} onChange={e => setSolNome(e.target.value)} placeholder="Nome" className={INP} />
@@ -315,13 +353,13 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
         )}
       </div>
 
-      {/* Anfitriões (REUNIAO only) */}
+      {/* Anfitriões (REUNIAO) */}
       {tipo === "REUNIAO" && (
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1.5">
-            <Home size={11} className="inline mr-1" />Anfitriões da casa
+            <Home size={11} className="inline mr-1" />Anfitriões (pode ser casal)
           </label>
-          <ContactSearch placeholder="Buscar anfitrião (pode ser casal)..." onSelect={addAnfitriao} />
+          <ContactSearch placeholder="Buscar anfitrião..." onSelect={addAnfitriao} />
           {anfitrioes.length > 0 && (
             <div className="flex flex-col gap-1.5 mt-2">
               {anfitrioes.map(a => (
@@ -331,21 +369,18 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
                   </div>
                   <span className="flex-1 text-sm font-medium text-green-900">{a.name}</span>
                   {a.role && <RoleBadge role={a.role} />}
-                  <button type="button" onClick={() => removeAnfitriao(a.id)} className="text-green-300 hover:text-red-400"><X size={13} /></button>
+                  <button type="button" onClick={() => setAnfitrioes(prev => prev.filter(x => x.id !== a.id))}
+                    className="text-green-300 hover:text-red-400"><X size={13} /></button>
                 </div>
               ))}
             </div>
           )}
-
-          {/* Demanda do anfitrião */}
           {demandas.length > 0 && (
             <div className="mt-2">
               <label className="block text-xs font-medium text-gray-500 mb-1"><FileText size={11} className="inline mr-1" />Demanda vinculada</label>
               <select value={demandaId} onChange={e => setDemandaId(e.target.value)} className={`${INP} bg-white`}>
                 <option value="">Sem demanda</option>
-                {demandas.map(d => (
-                  <option key={d.id} value={d.id}>{d.titulo}</option>
-                ))}
+                {demandas.map(d => <option key={d.id} value={d.id}>{d.titulo}</option>)}
               </select>
             </div>
           )}
@@ -362,7 +397,7 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Observações</label>
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
-            placeholder="Notas internas..." className={`${INP} resize-none`} />
+            placeholder="Notas..." className={`${INP} resize-none`} />
         </div>
       </div>
 
@@ -388,15 +423,17 @@ function EventForm({ initial, defaultDate, onSave, onClose, onDelete }: {
 
 // ─── EventPill ────────────────────────────────────────────────────────────────
 
-function EventPill({ evento, onClick, compact = false }: { evento: any; onClick: () => void; compact?: boolean }) {
-  const t  = TIPOS[evento.tipo] ?? TIPOS.AGENDA;
-  const st = STATUS_CFG[evento.status] ?? STATUS_CFG.PENDENTE;
+function EventPill({ evento, calendarios, onClick }: { evento: any; calendarios: any[]; onClick: () => void }) {
+  const t   = TIPOS[evento.tipo] ?? TIPOS.AGENDA;
+  const cal = calendarios.find(c => c.id === evento.calendarioId);
+  const bg  = cal ? `${cal.cor}22` : t.bg;
+  const col = cal ? cal.cor : t.color;
   const cancelled = evento.status === "CANCELADA";
   return (
     <div onClick={e => { e.stopPropagation(); onClick(); }}
-      className={`rounded-md px-1.5 py-0.5 text-xs font-medium cursor-pointer truncate ${cancelled ? "opacity-50 line-through" : ""}`}
-      style={{ backgroundColor: t.bg, color: t.color, borderLeft: `3px solid ${t.color}` }}>
-      {!compact && <span className="opacity-70 mr-1">{format(new Date(evento.inicio), "HH:mm")}</span>}
+      className={`rounded px-1 py-0.5 text-[11px] font-medium cursor-pointer truncate leading-tight ${cancelled ? "opacity-40 line-through" : ""}`}
+      style={{ backgroundColor: bg, color: col, borderLeft: `2px solid ${col}` }}>
+      <span className="opacity-80 mr-0.5">{format(new Date(evento.inicio), "HH:mm")}</span>
       {evento.titulo}
     </div>
   );
@@ -404,37 +441,35 @@ function EventPill({ evento, onClick, compact = false }: { evento: any; onClick:
 
 // ─── Month View ───────────────────────────────────────────────────────────────
 
-function MonthView({ currentDate, events, onDayClick, onEventClick }: {
-  currentDate: Date; events: any[]; onDayClick: (d: Date) => void; onEventClick: (e: any) => void;
+function MonthView({ currentDate, events, calendarios, onDayClick, onEventClick }: {
+  currentDate: Date; events: any[]; calendarios: any[];
+  onDayClick: (d: Date) => void; onEventClick: (e: any) => void;
 }) {
   const cells = getMonthGrid(currentDate.getFullYear(), currentDate.getMonth());
-
   return (
-    <div className="flex flex-col flex-1">
-      {/* Header */}
-      <div className="grid grid-cols-7 border-b border-gray-100">
+    <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="grid grid-cols-7 border-b border-gray-100 shrink-0">
         {WEEKDAYS.map(d => (
-          <div key={d} className="text-center text-xs font-semibold text-gray-400 py-2">{d}</div>
+          <div key={d} className="text-center text-[11px] font-semibold text-gray-400 py-1.5">{d}</div>
         ))}
       </div>
-      {/* Grid */}
-      <div className="grid grid-cols-7 flex-1" style={{ gridAutoRows: "1fr" }}>
+      <div className="grid grid-cols-7 flex-1 overflow-auto" style={{ gridAutoRows: "minmax(70px, 1fr)" }}>
         {cells.map((cell, i) => {
           const dayEvents = events.filter(e => isSameDay(new Date(e.inicio), cell));
           const inMonth   = isSameMonth(cell, currentDate);
           const today     = isToday(cell);
           return (
             <div key={i} onClick={() => onDayClick(cell)}
-              className={`border-b border-r border-gray-100 p-1 min-h-[70px] cursor-pointer hover:bg-gray-50 transition-colors ${!inMonth ? "bg-gray-50/60" : ""}`}>
+              className={`border-b border-r border-gray-100 p-1 cursor-pointer hover:bg-gray-50 transition-colors ${!inMonth ? "bg-gray-50/70" : ""}`}>
               <div className={`text-[11px] font-semibold mb-0.5 w-5 h-5 flex items-center justify-center rounded-full ${today ? "bg-brand-600 text-white" : inMonth ? "text-gray-700" : "text-gray-300"}`}>
                 {cell.getDate()}
               </div>
               <div className="flex flex-col gap-0.5">
                 {dayEvents.slice(0, 3).map(ev => (
-                  <EventPill key={ev.id} evento={ev} onClick={() => onEventClick(ev)} />
+                  <EventPill key={ev.id} evento={ev} calendarios={calendarios} onClick={() => onEventClick(ev)} />
                 ))}
                 {dayEvents.length > 3 && (
-                  <span className="text-[10px] text-gray-400 pl-1">+{dayEvents.length - 3} mais</span>
+                  <span className="text-[10px] text-gray-400 pl-1">+{dayEvents.length - 3}</span>
                 )}
               </div>
             </div>
@@ -447,8 +482,9 @@ function MonthView({ currentDate, events, onDayClick, onEventClick }: {
 
 // ─── Week View ────────────────────────────────────────────────────────────────
 
-function WeekView({ currentDate, events, onEventClick, onSlotClick }: {
-  currentDate: Date; events: any[]; onEventClick: (e: any) => void; onSlotClick: (d: Date) => void;
+function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick }: {
+  currentDate: Date; events: any[]; calendarios: any[];
+  onEventClick: (e: any) => void; onSlotClick: (d: Date) => void;
 }) {
   const days  = getWeekDays(currentDate);
   const hours = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => i + START_HOUR);
@@ -457,23 +493,13 @@ function WeekView({ currentDate, events, onEventClick, onSlotClick }: {
     return events.filter(e => isSameDay(new Date(e.inicio), day));
   }
 
-  function getStyle(evento: any) {
-    const start   = new Date(evento.inicio);
-    const minFrom = (start.getHours() - START_HOUR) * 60 + start.getMinutes();
-    const dur     = evento.duracao ?? 60;
-    return {
-      top:    `${(minFrom / 60) * HOUR_PX}px`,
-      height: `${Math.max(24, (dur / 60) * HOUR_PX - 2)}px`,
-    };
-  }
-
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Day headers */}
-      <div className="grid border-b border-gray-100" style={{ gridTemplateColumns: "56px repeat(7, 1fr)" }}>
-        <div />
+      <div className="flex shrink-0 border-b border-gray-100">
+        <div className="w-14 shrink-0" />
         {days.map((d, i) => (
-          <div key={i} className="text-center py-1.5 border-l border-gray-100">
+          <div key={i} className="flex-1 text-center py-1.5 border-l border-gray-100 min-w-0">
             <p className="text-[10px] font-medium text-gray-400 uppercase">{WEEKDAYS[d.getDay()]}</p>
             <div className={`text-xs font-bold mx-auto w-6 h-6 flex items-center justify-center rounded-full ${isToday(d) ? "bg-brand-600 text-white" : "text-gray-700"}`}>
               {d.getDate()}
@@ -481,40 +507,53 @@ function WeekView({ currentDate, events, onEventClick, onSlotClick }: {
           </div>
         ))}
       </div>
-      {/* Time grid */}
+      {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto">
-        <div className="grid" style={{ gridTemplateColumns: "56px repeat(7, 1fr)" }}>
-          {/* Time labels */}
-          <div>
+        <div className="flex" style={{ height: TOTAL_H }}>
+          {/* Hour labels */}
+          <div className="w-14 shrink-0">
             {hours.map(h => (
-              <div key={h} style={{ height: HOUR_PX }} className="flex items-start justify-end pr-2 pt-1 border-b border-gray-50">
+              <div key={h} style={{ height: HOUR_PX }}
+                className="flex items-start justify-end pr-2 pt-0.5 border-b border-gray-100">
                 <span className="text-[10px] text-gray-400">{h}:00</span>
               </div>
             ))}
           </div>
           {/* Day columns */}
           {days.map((day, di) => (
-            <div key={di} className="relative border-l border-gray-100" style={{ minHeight: HOUR_PX * hours.length }}>
-              {/* Hour lines */}
+            <div key={di} className="flex-1 border-l border-gray-100 min-w-0"
+              style={{ position: "relative", height: TOTAL_H }}>
+              {/* Hour slots (clickable) */}
               {hours.map(h => (
-                <div key={h} style={{ height: HOUR_PX, top: (h - START_HOUR) * HOUR_PX }}
-                  className="absolute left-0 right-0 border-b border-gray-50 cursor-pointer hover:bg-gray-50"
-                  onClick={() => {
-                    const d = new Date(day);
-                    d.setHours(h, 0, 0, 0);
-                    onSlotClick(d);
-                  }} />
+                <div key={h}
+                  style={{ position: "absolute", top: (h - START_HOUR) * HOUR_PX, left: 0, right: 0, height: HOUR_PX }}
+                  className="border-b border-gray-100 hover:bg-gray-50/50 cursor-pointer"
+                  onClick={() => { const d = new Date(day); d.setHours(h, 0, 0, 0); onSlotClick(d); }}
+                />
               ))}
               {/* Events */}
               {eventsForDay(day).map(ev => {
-                const t = TIPOS[ev.tipo] ?? TIPOS.AGENDA;
-                const s = getStyle(ev);
+                const start   = new Date(ev.inicio);
+                const minFrom = (start.getHours() - START_HOUR) * 60 + start.getMinutes();
+                if (minFrom < 0 || minFrom >= (END_HOUR - START_HOUR) * 60) return null;
+                const dur = ev.duracao ?? 60;
+                const cal = calendarios.find(c => c.id === ev.calendarioId);
+                const t   = TIPOS[ev.tipo] ?? TIPOS.AGENDA;
+                const col = cal?.cor ?? t.color;
+                const bg  = cal ? `${col}22` : t.bg;
                 return (
                   <div key={ev.id} onClick={() => onEventClick(ev)}
-                    className="absolute left-1 right-1 rounded-lg px-1.5 py-1 text-xs cursor-pointer z-10 overflow-hidden shadow-sm"
-                    style={{ ...s, backgroundColor: t.bg, color: t.color, borderLeft: `3px solid ${t.color}` }}>
-                    <p className="font-semibold truncate">{ev.titulo}</p>
-                    <p className="opacity-70">{format(new Date(ev.inicio), "HH:mm")}</p>
+                    style={{
+                      position: "absolute",
+                      top: `${(minFrom / 60) * HOUR_PX}px`,
+                      height: `${Math.max(18, (dur / 60) * HOUR_PX - 2)}px`,
+                      left: 2, right: 2,
+                      backgroundColor: bg, color: col,
+                      borderLeft: `3px solid ${col}`,
+                    }}
+                    className="rounded-md px-1.5 py-0.5 text-[11px] cursor-pointer z-10 overflow-hidden shadow-sm">
+                    <p className="font-semibold truncate leading-tight">{ev.titulo}</p>
+                    <p className="opacity-70 leading-none">{format(start, "HH:mm")}</p>
                   </div>
                 );
               })}
@@ -526,75 +565,66 @@ function WeekView({ currentDate, events, onEventClick, onSlotClick }: {
   );
 }
 
-// ─── Agenda List View ─────────────────────────────────────────────────────────
+// ─── Agenda (List) View ───────────────────────────────────────────────────────
 
-function AgendaListView({ events, onEventClick }: { events: any[]; onEventClick: (e: any) => void }) {
+function AgendaListView({ events, calendarios, onEventClick }: {
+  events: any[]; calendarios: any[]; onEventClick: (e: any) => void;
+}) {
   const sorted = [...events].sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime());
-
-  // Group by day
   const grouped: Record<string, any[]> = {};
   for (const ev of sorted) {
     const key = format(new Date(ev.inicio), "yyyy-MM-dd");
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(ev);
   }
-
-  if (sorted.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center flex-1 text-gray-400 py-20">
-        <CalendarDays size={40} className="mb-3 opacity-30" />
-        <p className="font-medium">Nenhum evento neste período</p>
-        <p className="text-sm mt-1">Clique em "+ Nova Agenda" para adicionar</p>
-      </div>
-    );
-  }
-
+  if (sorted.length === 0) return (
+    <div className="flex flex-col items-center justify-center flex-1 text-gray-400 py-20">
+      <CalendarDays size={36} className="mb-3 opacity-30" />
+      <p className="font-medium">Nenhum evento neste período</p>
+    </div>
+  );
   return (
     <div className="flex-1 overflow-y-auto p-4">
-      <div className="max-w-2xl mx-auto flex flex-col gap-6">
+      <div className="max-w-2xl mx-auto flex flex-col gap-5">
         {Object.entries(grouped).map(([dayKey, dayEvents]) => {
           const day = new Date(dayKey + "T12:00:00");
           return (
             <div key={dayKey}>
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-2.5 mb-2">
                 <div className={`w-8 h-8 rounded-lg flex flex-col items-center justify-center shrink-0 ${isToday(day) ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-700"}`}>
-                  <span className="text-[9px] leading-none uppercase font-semibold">{format(day, "EEE", { locale: ptBR }).slice(0, 3)}</span>
+                  <span className="text-[9px] uppercase font-semibold leading-none">{format(day, "EEE", { locale: ptBR }).slice(0, 3)}</span>
                   <span className="text-sm font-bold leading-none">{day.getDate()}</span>
                 </div>
                 <p className="text-sm font-semibold text-gray-700">
                   {format(day, "EEEE, dd 'de' MMMM", { locale: ptBR })}
                 </p>
               </div>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5">
                 {dayEvents.map(ev => {
-                  const t  = TIPOS[ev.tipo]   ?? TIPOS.AGENDA;
-                  const st = STATUS_CFG[ev.status] ?? STATUS_CFG.PENDENTE;
+                  const t   = TIPOS[ev.tipo]       ?? TIPOS.AGENDA;
+                  const st  = STATUS_CFG[ev.status] ?? STATUS_CFG.PENDENTE;
+                  const cal = calendarios.find(c => c.id === ev.calendarioId);
+                  const col = cal?.cor ?? t.color;
                   return (
                     <div key={ev.id} onClick={() => onEventClick(ev)}
-                      className="flex items-start gap-3 bg-white border border-gray-100 rounded-xl p-2.5 cursor-pointer hover:shadow-sm transition-shadow">
-                      <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                      className="flex items-start gap-2.5 bg-white border border-gray-100 rounded-xl p-2.5 cursor-pointer hover:shadow-sm transition-shadow">
+                      <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: col }} />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <p className={`font-medium text-sm ${ev.status === "CANCELADA" ? "line-through opacity-50" : "text-gray-900"}`}>{ev.titulo}</p>
-                          <span className="text-xs px-2 py-0.5 rounded-full" style={{ color: t.color, backgroundColor: t.bg }}>{t.label}</span>
-                          <span className="text-xs px-2 py-0.5 rounded-full" style={{ color: st.color, backgroundColor: st.bg }}>{st.label}</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ color: t.color, backgroundColor: t.bg }}>{t.label}</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ color: st.color, backgroundColor: st.bg }}>{st.label}</span>
+                          {cal && <span className="text-xs px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: col }}>{cal.nome}</span>}
                         </div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
+                        <div className="flex items-center gap-2.5 mt-0.5 text-xs text-gray-400 flex-wrap">
                           <span className="flex items-center gap-1"><Clock size={11} />{format(new Date(ev.inicio), "HH:mm")}{ev.duracao ? ` · ${ev.duracao}min` : ""}</span>
                           {ev.local && <span className="flex items-center gap-1"><MapPin size={11} />{ev.local}{ev.bairro ? ` · ${ev.bairro}` : ""}</span>}
-                          {ev.quantidadePessoas && <span className="flex items-center gap-1"><Users size={11} />{ev.quantidadePessoas} pessoas</span>}
+                          {ev.quantidadePessoas && <span className="flex items-center gap-1"><Users size={11} />{ev.quantidadePessoas}p</span>}
                         </div>
                         {ev.anfitrioes?.length > 0 && (
-                          <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
-                            <Home size={11} />
-                            {ev.anfitrioes.map((a: any) => a.contact.name).join(" & ")}
-                          </div>
-                        )}
-                        {ev.solicitante && (
-                          <p className="text-xs text-gray-400 mt-0.5">Solicitante: {ev.solicitante.name}</p>
-                        )}
-                        {ev.solicitanteNome && (
-                          <p className="text-xs text-gray-400 mt-0.5">Solicitante: {ev.solicitanteNome}</p>
+                          <p className="flex items-center gap-1 mt-0.5 text-xs text-gray-500">
+                            <Home size={11} />{ev.anfitrioes.map((a: any) => a.contact.name).join(" & ")}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -619,7 +649,7 @@ const VIEWS = [
   { key: "agenda", label: "Lista",  icon: List },
 ] as const;
 
-function getDateRange(view: ViewType, ref: Date): { start: Date; end: Date } {
+function getDateRange(view: ViewType, ref: Date) {
   if (view === "mes") {
     const start = new Date(ref.getFullYear(), ref.getMonth(), 1);
     start.setDate(start.getDate() - start.getDay());
@@ -629,9 +659,10 @@ function getDateRange(view: ViewType, ref: Date): { start: Date; end: Date } {
   }
   if (view === "semana") {
     const days = getWeekDays(ref);
-    return { start: days[0], end: days[6] };
+    const end = new Date(days[6]);
+    end.setHours(23, 59, 59);
+    return { start: days[0], end };
   }
-  // agenda: 60 days ahead
   const end = new Date(ref);
   end.setDate(ref.getDate() + 60);
   return { start: ref, end };
@@ -648,31 +679,45 @@ function navigate(view: ViewType, ref: Date, dir: -1 | 1): Date {
 export default function AgendaPage() {
   const [view, setView]         = useState<ViewType>("mes");
   const [refDate, setRefDate]   = useState(new Date());
-  const [events, setEvents]     = useState<any[]>([]);
+  const [allEvents, setAllEvents] = useState<any[]>([]);
+  const [calendarios, setCalendarios]   = useState<any[]>([]);
+  const [selectedCals, setSelectedCals] = useState<string[]>([]);
   const [loading, setLoading]   = useState(true);
   const [modal, setModal]       = useState<"novo" | "editar" | null>(null);
   const [selected, setSelected] = useState<any | null>(null);
   const [defaultDate, setDefaultDate] = useState<Date | undefined>();
+
+  // Load calendários
+  useEffect(() => {
+    fetch("/api/agenda/calendarios").then(r => r.json()).then((cals: any[]) => {
+      setCalendarios(cals);
+      setSelectedCals(cals.map(c => c.id)); // all selected by default
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const { start, end } = getDateRange(view, refDate);
       const r = await fetch(`/api/agenda?start=${start.toISOString()}&end=${end.toISOString()}`);
-      setEvents(await r.json());
+      setAllEvents(await r.json());
     } finally { setLoading(false); }
   }, [view, refDate]);
 
   useEffect(() => { load(); }, [load]);
 
-  function openNew(date?: Date) {
-    setSelected(null);
-    setDefaultDate(date);
-    setModal("novo");
-  }
+  // Filter events by selected calendars
+  const events = selectedCals.length === 0 ? allEvents : allEvents.filter(ev =>
+    !ev.calendarioId || selectedCals.includes(ev.calendarioId)
+  );
 
-  function openEdit(ev: any) { setSelected(ev); setDefaultDate(undefined); setModal("editar"); }
-  function closeModal() { setModal(null); setSelected(null); }
+  function openNew(date?: Date) { setSelected(null); setDefaultDate(date); setModal("novo"); }
+  function openEdit(ev: any)    { setSelected(ev); setDefaultDate(undefined); setModal("editar"); }
+  function closeModal()          { setModal(null); setSelected(null); }
+
+  function toggleCal(id: string) {
+    setSelectedCals(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
 
   const dateLabel = view === "mes"
     ? format(refDate, "MMMM yyyy", { locale: ptBR })
@@ -682,7 +727,7 @@ export default function AgendaPage() {
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Header — padrão do sistema */}
+      {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 shrink-0">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Agenda</h1>
@@ -694,10 +739,9 @@ export default function AgendaPage() {
         </button>
       </header>
 
-      {/* Toolbar: views + navegação + legenda */}
+      {/* Toolbar */}
       <div className="flex items-center justify-between px-6 py-2 bg-white border-b border-gray-100 shrink-0">
         <div className="flex items-center gap-2">
-          {/* View */}
           <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
             {VIEWS.map(({ key, label, icon: Icon }) => (
               <button key={key} onClick={() => setView(key as ViewType)}
@@ -706,7 +750,6 @@ export default function AgendaPage() {
               </button>
             ))}
           </div>
-          {/* Navegação */}
           <div className="flex items-center gap-1">
             <button onClick={() => setRefDate(navigate(view, refDate, -1))}
               className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><ChevronLeft size={15} /></button>
@@ -717,30 +760,45 @@ export default function AgendaPage() {
           </div>
           <span className="text-sm font-semibold text-gray-700 capitalize">{dateLabel}</span>
         </div>
-        {/* Legenda */}
+        {/* Tipo legenda */}
         <div className="flex items-center gap-3">
           {Object.entries(TIPOS).map(([k, v]) => (
             <span key={k} className="flex items-center gap-1.5 text-xs text-gray-500">
-              <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: v.color }} />
-              {v.label}
+              <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: v.color }} />{v.label}
             </span>
           ))}
         </div>
       </div>
 
-      {/* Calendar content */}
-      <div className="flex-1 overflow-hidden flex flex-col">
-        {loading ? (
-          <div className="flex justify-center items-center flex-1">
-            <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : view === "mes" ? (
-          <MonthView currentDate={refDate} events={events} onDayClick={openNew} onEventClick={openEdit} />
-        ) : view === "semana" ? (
-          <WeekView currentDate={refDate} events={events} onEventClick={openEdit} onSlotClick={d => openNew(d)} />
-        ) : (
-          <AgendaListView events={events} onEventClick={openEdit} />
-        )}
+      {/* Body: sidebar + calendar */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar calendários */}
+        <aside className="w-44 border-r border-gray-100 bg-white flex flex-col shrink-0 overflow-y-auto py-3">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase px-3 mb-1.5">Calendários</p>
+          {calendarios.map(cal => (
+            <label key={cal.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+              <input type="checkbox" checked={selectedCals.includes(cal.id)} onChange={() => toggleCal(cal.id)}
+                className="rounded w-3.5 h-3.5" style={{ accentColor: cal.cor }} />
+              <span className="text-xs text-gray-700 truncate">{cal.nome}</span>
+              <span className="w-2 h-2 rounded-full shrink-0 ml-auto" style={{ backgroundColor: cal.cor }} />
+            </label>
+          ))}
+        </aside>
+
+        {/* Calendar content */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {loading ? (
+            <div className="flex justify-center items-center flex-1">
+              <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : view === "mes" ? (
+            <MonthView currentDate={refDate} events={events} calendarios={calendarios} onDayClick={openNew} onEventClick={openEdit} />
+          ) : view === "semana" ? (
+            <WeekView currentDate={refDate} events={events} calendarios={calendarios} onEventClick={openEdit} onSlotClick={d => openNew(d)} />
+          ) : (
+            <AgendaListView events={events} calendarios={calendarios} onEventClick={openEdit} />
+          )}
+        </div>
       </div>
 
       {/* Modal */}
@@ -749,6 +807,7 @@ export default function AgendaPage() {
         <EventForm
           initial={modal === "editar" ? selected : undefined}
           defaultDate={defaultDate}
+          calendarios={calendarios}
           onSave={() => { closeModal(); load(); }}
           onClose={closeModal}
           onDelete={modal === "editar" ? () => { load(); closeModal(); } : undefined}
