@@ -2,8 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Plus, Search, Users, MapPin, Calendar, Clock,
-  Trash2, Edit2, Send, MessageSquare, Star, X, Home,
-  ChevronRight, Copy, Check,
+  Trash2, Edit2, Star, X, Home,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { RoleBadge } from "@/components/ui/RoleBadge";
@@ -75,15 +74,19 @@ function ContactSearch({ placeholder = "Buscar contato...", onSelect }: {
   );
 }
 
-// ─── StarRating ────────────────────────────────────────────────────────────────
+// ─── NumberRating ──────────────────────────────────────────────────────────────
 
-function StarRating({ value, onChange, max = 5 }: { value: number; onChange: (v: number) => void; max?: number }) {
+function NumberRating({ value, onChange, max = 5 }: { value: number; onChange: (v: number) => void; max?: number }) {
   return (
-    <div className="flex gap-0.5">
-      {Array.from({ length: max }, (_, i) => (
-        <button key={i} type="button" onClick={() => onChange(i + 1)}
-          className={`text-lg transition-colors ${i < value ? "text-amber-400" : "text-gray-200 hover:text-amber-200"}`}>
-          ★
+    <div className="flex gap-1">
+      {Array.from({ length: max + 1 }, (_, i) => (
+        <button key={i} type="button" onClick={() => onChange(i)}
+          className={`w-7 h-7 rounded text-xs font-semibold transition-colors ${
+            value === i
+              ? "bg-brand-600 text-white"
+              : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+          }`}>
+          {i}
         </button>
       ))}
     </div>
@@ -118,43 +121,60 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
   const [status,  setStatus]  = useState(initial?.status  ?? "REALIZADA");
   const [notes,   setNotes]   = useState(initial?.notes   ?? "");
 
-  const [lider,      setLider]      = useState<any | null>(initial?.lider ?? null);
-  const [anfitrioes, setAnfitrioes] = useState<any[]>(initial?.anfitrioes?.map((a: any) => a.contact) ?? []);
+  const [lider, setLider] = useState<any | null>(initial?.lider ?? null);
 
-  // Presentes: {contactId?, contact?, nome?, telefone?, _key}
-  const [presentes,  setPresentes]  = useState<any[]>(
-    initial?.presentes?.map((p: any, i: number) => ({
-      _key: i, contactId: p.contactId, contact: p.contact, nome: p.nome, telefone: p.telefone,
+  // Anfitriões: agora aceita base e manual — mesmo shape dos presentes
+  const [anfitrioes, setAnfitrioes] = useState<any[]>(
+    initial?.anfitrioes?.map((a: any, i: number) => ({
+      _key: `a${i}`, contactId: a.contactId, contact: a.contact,
     })) ?? []
   );
-  const [addMode,    setAddMode]    = useState<"base" | "manual">("base");
-  const [manualNome, setManualNome] = useState("");
-  const [manualTel,  setManualTel]  = useState("");
+  const [anfMode, setAnfMode] = useState<"base" | "manual">("base");
+  const [anfNome, setAnfNome] = useState("");
+  const [anfTel,  setAnfTel]  = useState("");
 
-  // Avaliações: 3 slots fixos
+  // Presentes
+  const [presentes, setPresentes] = useState<any[]>(
+    initial?.presentes?.map((p: any, i: number) => ({
+      _key: `p${i}`, contactId: p.contactId, contact: p.contact, nome: p.nome, telefone: p.telefone,
+    })) ?? []
+  );
+  const [presMode,    setPresMode]    = useState<"base" | "manual">("base");
+  const [presNome,    setPresNome]    = useState("");
+  const [presTel,     setPresTel]     = useState("");
+
+  // Avaliações: 3 slots, sem obs
   const initAval = (slot: number) => {
     const found = initial?.avaliacoes?.find((a: any) => a.slot === slot);
-    return { slot, avaliador: found?.avaliador ?? null, avaliadorNome: found?.avaliadorNome ?? "", atencao: found?.atencao ?? 0, interacao: found?.interacao ?? 0, obs: found?.obs ?? "" };
+    return { slot, avaliador: found?.avaliador ?? null, avaliadorNome: found?.avaliadorNome ?? "", atencao: found?.atencao ?? 0, interacao: found?.interacao ?? 0 };
   };
   const [aval, setAval] = useState([initAval(1), initAval(2), initAval(3)]);
 
-  const [saving,   setSaving]   = useState(false);
-  const nextKey = useRef(initial?.presentes?.length ?? 0);
+  const [saving, setSaving] = useState(false);
+  const nextKey = useRef(0);
+  const newKey = (prefix: string) => `${prefix}${Date.now()}-${nextKey.current++}`;
 
-  function addPresente(contact: any) {
+  function addPresenteBase(contact: any) {
     if (presentes.find(p => p.contactId === contact.id)) return;
-    setPresentes(prev => [...prev, { _key: nextKey.current++, contactId: contact.id, contact }]);
+    setPresentes(prev => [...prev, { _key: newKey("p"), contactId: contact.id, contact }]);
+  }
+  function addPresenteManual() {
+    if (!presTel.trim() && !presNome.trim()) return;
+    setPresentes(prev => [...prev, { _key: newKey("pm"), nome: presNome.trim(), telefone: presTel.trim() }]);
+    setPresNome(""); setPresTel("");
   }
 
-  function addManual() {
-    if (!manualTel.trim() && !manualNome.trim()) return;
-    setPresentes(prev => [...prev, { _key: nextKey.current++, nome: manualNome.trim(), telefone: manualTel.trim() }]);
-    setManualNome(""); setManualTel("");
+  function addAnfitriaoBase(contact: any) {
+    if (anfitrioes.find(a => a.contactId === contact.id)) return;
+    setAnfitrioes(prev => [...prev, { _key: newKey("a"), contactId: contact.id, contact }]);
+    addPresenteBase(contact);
   }
-
-  function addAnfitriao(c: any) {
-    if (!anfitrioes.find(a => a.id === c.id)) setAnfitrioes(prev => [...prev, c]);
-    addPresente(c); // anfitrião também entra na lista de presentes automaticamente
+  function addAnfitriaoManual() {
+    if (!anfTel.trim() && !anfNome.trim()) return;
+    const entry = { nome: anfNome.trim(), telefone: anfTel.trim() };
+    setAnfitrioes(prev => [...prev, { _key: newKey("am"), ...entry }]);
+    setPresentes(prev => [...prev, { _key: newKey("pm"), ...entry }]);
+    setAnfNome(""); setAnfTel("");
   }
 
   function updateAval(slot: number, patch: any) {
@@ -174,12 +194,12 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
           titulo, dataHora: new Date(dataHora).toISOString(),
           local, bairro, zona, status, notes,
           liderId: lider?.id ?? null,
-          anfitriaoIds: anfitrioes.map(a => a.id),
-          presentes: presentes.map(p => ({ contactId: p.contactId ?? null, nome: p.nome ?? null, telefone: p.telefone ?? null })),
+          anfitrioes: anfitrioes.map(a => ({ contactId: a.contactId ?? null, nome: a.nome ?? null, telefone: a.telefone ?? null })),
+          presentes:  presentes.map(p =>  ({ contactId: p.contactId ?? null, nome: p.nome ?? null, telefone: p.telefone ?? null })),
           avaliacoes: aval.map(a => ({
-            slot: a.slot, atencao: a.atencao, interacao: a.interacao, obs: a.obs || null,
-            avaliadorId:   a.avaliador?.id   ?? null,
-            avaliadorNome: a.avaliadorNome   || null,
+            slot: a.slot, atencao: a.atencao, interacao: a.interacao,
+            avaliadorId:   a.avaliador?.id ?? null,
+            avaliadorNome: a.avaliadorNome || null,
           })),
         }),
       });
@@ -189,7 +209,8 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
     } finally { setSaving(false); }
   }
 
-  const anfIds = new Set(anfitrioes.map(a => a.id));
+  const anfIds = new Set(anfitrioes.filter(a => a.contactId).map(a => a.contactId));
+  const anfPhones = new Set(anfitrioes.filter(a => !a.contactId && a.telefone).map(a => a.telefone));
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-5">
@@ -261,17 +282,55 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
         )}
       </section>
 
-      {/* Anfitriões da casa */}
+      {/* Anfitriões da casa — base ou manual */}
       <section>
-        <h3 className="text-xs font-semibold text-gray-400 uppercase mb-1.5">
+        <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">
           <Home size={11} className="inline mr-1" />Anfitriões da Casa
         </h3>
-        <ContactSearch placeholder="Buscar anfitrião..." onSelect={addAnfitriao} />
+        <div className="flex gap-1.5 mb-2">
+          {(["base", "manual"] as const).map(m => (
+            <button key={m} type="button" onClick={() => setAnfMode(m)}
+              className={`text-xs px-3 py-1 rounded-full border font-medium transition-all ${anfMode === m ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
+              {m === "base" ? "Da base" : "Número novo"}
+            </button>
+          ))}
+        </div>
+
+        {anfMode === "base" ? (
+          <ContactSearch placeholder="Buscar anfitrião na base..." onSelect={addAnfitriaoBase} />
+        ) : (
+          <div className="flex gap-2">
+            <input value={anfNome} onChange={e => setAnfNome(e.target.value)} placeholder="Nome" className={`${INP} flex-1`} />
+            <input value={anfTel}  onChange={e => setAnfTel(e.target.value)}  placeholder="Telefone" className={`${INP} flex-1`} />
+            <button type="button" onClick={addAnfitriaoManual} className="bg-brand-600 text-white px-3 py-2 rounded-lg text-sm font-medium">
+              <Plus size={15} />
+            </button>
+          </div>
+        )}
+
         {anfitrioes.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {anfitrioes.map(a => (
-              <ContactChip key={a.id} contact={a} label="anfitrião"
-                onRemove={() => setAnfitrioes(prev => prev.filter(x => x.id !== a.id))} />
+              <div key={a._key} className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                <Home size={11} className="text-amber-600" />
+                <span className="text-xs font-medium text-amber-900 truncate max-w-32">
+                  {a.contact?.name ?? a.nome ?? "—"}
+                </span>
+                {(a.contact?.phone ?? a.telefone) && (
+                  <span className="text-[10px] text-amber-500">{a.contact?.phone ?? a.telefone}</span>
+                )}
+                <button type="button"
+                  onClick={() => {
+                    setAnfitrioes(prev => prev.filter(x => x._key !== a._key));
+                    // Remove o presente correspondente também
+                    setPresentes(prev => prev.filter(p => {
+                      if (a.contactId && p.contactId === a.contactId) return false;
+                      if (!a.contactId && p.telefone === a.telefone && p.nome === a.nome) return false;
+                      return true;
+                    }));
+                  }}
+                  className="text-amber-300 hover:text-red-400 ml-0.5"><X size={11} /></button>
+              </div>
             ))}
           </div>
         )}
@@ -284,20 +343,20 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
         </h3>
         <div className="flex gap-1.5 mb-2">
           {(["base", "manual"] as const).map(m => (
-            <button key={m} type="button" onClick={() => setAddMode(m)}
-              className={`text-xs px-3 py-1 rounded-full border font-medium transition-all ${addMode === m ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
+            <button key={m} type="button" onClick={() => setPresMode(m)}
+              className={`text-xs px-3 py-1 rounded-full border font-medium transition-all ${presMode === m ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
               {m === "base" ? "Da base" : "Número novo"}
             </button>
           ))}
         </div>
 
-        {addMode === "base" ? (
-          <ContactSearch placeholder="Buscar contato para adicionar..." onSelect={addPresente} />
+        {presMode === "base" ? (
+          <ContactSearch placeholder="Buscar contato para adicionar..." onSelect={addPresenteBase} />
         ) : (
           <div className="flex gap-2">
-            <input value={manualNome} onChange={e => setManualNome(e.target.value)} placeholder="Nome" className={`${INP} flex-1`} />
-            <input value={manualTel}  onChange={e => setManualTel(e.target.value)}  placeholder="Telefone" className={`${INP} flex-1`} />
-            <button type="button" onClick={addManual} className="bg-brand-600 text-white px-3 py-2 rounded-lg text-sm font-medium">
+            <input value={presNome} onChange={e => setPresNome(e.target.value)} placeholder="Nome" className={`${INP} flex-1`} />
+            <input value={presTel}  onChange={e => setPresTel(e.target.value)}  placeholder="Telefone" className={`${INP} flex-1`} />
+            <button type="button" onClick={addPresenteManual} className="bg-brand-600 text-white px-3 py-2 rounded-lg text-sm font-medium">
               <Plus size={15} />
             </button>
           </div>
@@ -305,24 +364,28 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
 
         {presentes.length > 0 && (
           <div className="mt-2 max-h-40 overflow-y-auto bg-gray-50 rounded-lg divide-y divide-gray-100 border border-gray-200">
-            {presentes.map(p => (
-              <div key={p._key} className="flex items-center gap-2 px-3 py-2">
-                {anfIds.has(p.contactId) && (
-                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full shrink-0">anfitrião</span>
-                )}
-                <p className="flex-1 text-xs font-medium text-gray-800 truncate">
-                  {p.contact?.name ?? p.nome ?? "—"}
-                </p>
-                <p className="text-xs text-gray-400">{p.contact?.phone ?? p.telefone ?? ""}</p>
-                <button type="button" onClick={() => setPresentes(prev => prev.filter(x => x._key !== p._key))}
-                  className="text-gray-300 hover:text-red-400"><X size={12} /></button>
-              </div>
-            ))}
+            {presentes.map(p => {
+              const isAnf = (p.contactId && anfIds.has(p.contactId)) ||
+                            (!p.contactId && p.telefone && anfPhones.has(p.telefone));
+              return (
+                <div key={p._key} className="flex items-center gap-2 px-3 py-2">
+                  {isAnf && (
+                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full shrink-0">anfitrião</span>
+                  )}
+                  <p className="flex-1 text-xs font-medium text-gray-800 truncate">
+                    {p.contact?.name ?? p.nome ?? "—"}
+                  </p>
+                  <p className="text-xs text-gray-400">{p.contact?.phone ?? p.telefone ?? ""}</p>
+                  <button type="button" onClick={() => setPresentes(prev => prev.filter(x => x._key !== p._key))}
+                    className="text-gray-300 hover:text-red-400"><X size={12} /></button>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>
 
-      {/* Avaliações */}
+      {/* Avaliações — sem obs, escala 0-5 */}
       <section>
         <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2.5">
           <Star size={11} className="inline mr-1" />Avaliações da Equipe (3 avaliadores)
@@ -331,9 +394,9 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
           {aval.map(a => (
             <div key={a.slot} className="bg-gray-50 rounded-xl border border-gray-200 p-3">
               <p className="text-xs font-semibold text-gray-500 mb-2">Avaliador {a.slot}</p>
-              <div className="flex gap-2 mb-2">
+              <div className="mb-3">
                 {a.avaliador ? (
-                  <div className="flex items-center gap-1.5 flex-1 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5">
+                  <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5">
                     <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-700 shrink-0">
                       {a.avaliador.name?.[0]?.toUpperCase()}
                     </div>
@@ -342,26 +405,20 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
                       className="text-gray-300 hover:text-red-400"><X size={11} /></button>
                   </div>
                 ) : (
-                  <div className="flex-1">
-                    <ContactSearch placeholder="Buscar avaliador na base..."
-                      onSelect={c => updateAval(a.slot, { avaliador: c, avaliadorNome: c.name })} />
-                  </div>
+                  <ContactSearch placeholder="Buscar avaliador na base..."
+                    onSelect={c => updateAval(a.slot, { avaliador: c, avaliadorNome: c.name })} />
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Atenção</p>
-                  <StarRating value={a.atencao} onChange={v => updateAval(a.slot, { atencao: v })} />
-                  <p className="text-xs text-gray-400 mt-0.5">{a.atencao}/5</p>
+                  <p className="text-xs text-gray-500 mb-1.5">Atenção</p>
+                  <NumberRating value={a.atencao} onChange={v => updateAval(a.slot, { atencao: v })} />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Interação</p>
-                  <StarRating value={a.interacao} onChange={v => updateAval(a.slot, { interacao: v })} />
-                  <p className="text-xs text-gray-400 mt-0.5">{a.interacao}/5</p>
+                  <p className="text-xs text-gray-500 mb-1.5">Interação</p>
+                  <NumberRating value={a.interacao} onChange={v => updateAval(a.slot, { interacao: v })} />
                 </div>
               </div>
-              <input value={a.obs} onChange={e => updateAval(a.slot, { obs: e.target.value })}
-                placeholder="Obs..." className={`${INP} mt-2 text-xs`} />
             </div>
           ))}
         </div>
@@ -377,79 +434,13 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
   );
 }
 
-// ─── DisparoModal ─────────────────────────────────────────────────────────────
-
-function DisparoModal({ reuniao, onClose }: { reuniao: any; onClose: () => void }) {
-  const [copied, setCopied] = useState<string | null>(null);
-
-  const anfIds = new Set(reuniao.anfitrioes?.map((a: any) => a.contactId));
-  const presentes = (reuniao.presentes ?? []).filter((p: any) => !anfIds.has(p.contactId));
-  const anfitrioes = reuniao.anfitrioes ?? [];
-
-  function getPhone(p: any) {
-    return (p.contact?.phone ?? p.telefone ?? "").replace(/\D/g, "");
-  }
-
-  async function copy(text: string, key: string) {
-    await navigator.clipboard.writeText(text);
-    setCopied(key); setTimeout(() => setCopied(null), 2000);
-  }
-
-  function buildList(items: any[]) {
-    return items.map((p: any) => {
-      const phone = getPhone(p);
-      const name  = p.contact?.name ?? p.nome ?? "";
-      return phone;
-    }).filter(Boolean).join("\n");
-  }
-
-  const ListPanel = ({ title, items, colorKey }: { title: string; items: any[]; colorKey: string }) => {
-    const text = buildList(items);
-    return (
-      <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-semibold text-gray-600">{title} ({items.length})</p>
-          <button onClick={() => copy(text, colorKey)}
-            className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800 font-medium">
-            {copied === colorKey ? <><Check size={12} /> Copiado!</> : <><Copy size={12} /> Copiar números</>}
-          </button>
-        </div>
-        <div className="max-h-40 overflow-y-auto space-y-1">
-          {items.map((p: any, i: number) => (
-            <div key={i} className="flex items-center gap-2 text-xs text-gray-700">
-              <span className="font-medium w-32 truncate">{p.contact?.name ?? p.nome ?? "—"}</span>
-              <span className="text-gray-400">{getPhone(p)}</span>
-            </div>
-          ))}
-          {items.length === 0 && <p className="text-xs text-gray-400">Nenhum</p>}
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-gray-500">Números para envio de mensagens. Anfitriões e presentes listados separadamente.</p>
-      <ListPanel title="Presentes (sem anfitriões)" items={presentes} colorKey="presentes" />
-      <ListPanel title="Anfitriões da Casa" items={anfitrioes.map((a: any) => ({ ...a, contact: a.contact }))} colorKey="anfitrioes" />
-      <p className="text-xs text-gray-400">Copie os números e cole no módulo de Disparos para enviar mensagens em massa.</p>
-      <div className="flex justify-end gap-2 pt-2">
-        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Fechar</button>
-        <a href="/disparos" className="px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 rounded-lg font-medium flex items-center gap-1.5">
-          <Send size={13} /> Ir para Disparos
-        </a>
-      </div>
-    </div>
-  );
-}
-
 // ─── Página ───────────────────────────────────────────────────────────────────
 
 export default function ReunioesPage() {
   const [reunioes, setReunioes]   = useState<any[]>([]);
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState("");
-  const [modal, setModal]         = useState<"novo" | "editar" | "disparar" | null>(null);
+  const [modal, setModal]         = useState<"novo" | "editar" | null>(null);
   const [selected, setSelected]   = useState<any | null>(null);
 
   const load = useCallback(async (silent = false) => {
@@ -462,7 +453,6 @@ export default function ReunioesPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // SSE
   useEffect(() => {
     const es = new EventSource("/api/sse");
     es.addEventListener("reunioes", () => load(true));
@@ -473,17 +463,6 @@ export default function ReunioesPage() {
     if (!confirm(`Excluir "${r.titulo}"?`)) return;
     await fetch(`/api/reunioes/${r.id}`, { method: "DELETE" });
     toast.success("Reunião excluída");
-    load(true);
-  }
-
-  async function iniciarConversas(r: any) {
-    const res = await fetch(`/api/reunioes/${r.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "iniciar-conversas" }),
-    });
-    const d = await res.json();
-    if (d.ok) toast.success(`${d.criadas} conversa(s) iniciada(s) e vinculadas`);
     load(true);
   }
 
@@ -552,9 +531,6 @@ export default function ReunioesPage() {
                         {r.local && <span className="flex items-center gap-1"><MapPin size={11} />{r.local}</span>}
                         {r.lider && <span>Líder: {r.lider.name}</span>}
                         <span className="flex items-center gap-1"><Users size={11} />{r._count?.presentes ?? 0} presentes</span>
-                        {r._count?.conversas > 0 && (
-                          <span className="flex items-center gap-1 text-green-600"><MessageSquare size={11} />{r._count.conversas} conversas</span>
-                        )}
                       </div>
                       {r.anfitrioes?.length > 0 && (
                         <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
@@ -563,14 +539,6 @@ export default function ReunioesPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => { setSelected(r); setModal("disparar"); }}
-                        className="p-2 hover:bg-indigo-50 rounded-lg text-indigo-400 hover:text-indigo-600" title="Preparar disparo">
-                        <Send size={14} />
-                      </button>
-                      <button onClick={() => iniciarConversas(r)}
-                        className="p-2 hover:bg-green-50 rounded-lg text-green-400 hover:text-green-600" title="Iniciar conversas WhatsApp">
-                        <MessageSquare size={14} />
-                      </button>
                       <button onClick={() => { setSelected(r); setModal("editar"); }}
                         className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600">
                         <Edit2 size={14} />
@@ -594,9 +562,6 @@ export default function ReunioesPage() {
       </Modal>
       <Modal open={modal === "editar" && !!selected} onClose={closeModal} title="Editar Reunião" size="xl">
         <ReuniaoForm initial={selected} onSave={() => { closeModal(); load(true); }} onClose={closeModal} />
-      </Modal>
-      <Modal open={modal === "disparar" && !!selected} onClose={closeModal} title="Preparar Disparo" size="md">
-        {selected && <DisparoModal reuniao={selected} onClose={closeModal} />}
       </Modal>
     </div>
   );

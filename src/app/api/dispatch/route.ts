@@ -11,8 +11,48 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { groupId, message, delayMs = 1500 } = await req.json();
-  if (!groupId || !message) return NextResponse.json({ error: "groupId e message obrigatórios" }, { status: 400 });
+  const { groupId: rawGroupId, reuniaoId, mode = "all", message, delayMs = 1500 } = await req.json();
+  if (!message) return NextResponse.json({ error: "message obrigatório" }, { status: 400 });
+  if (!rawGroupId && !reuniaoId) return NextResponse.json({ error: "groupId ou reuniaoId obrigatório" }, { status: 400 });
+
+  let groupId = rawGroupId;
+
+  // Se origem é reunião, monta um ContactGroup virtual com os membros corretos
+  if (reuniaoId) {
+    const reuniao = await prisma.reuniao.findUnique({
+      where: { id: reuniaoId },
+      include: {
+        presentes:  { include: { contact: true } },
+        anfitrioes: { include: { contact: true } },
+      },
+    });
+    if (!reuniao) return NextResponse.json({ error: "Reunião não encontrada" }, { status: 404 });
+
+    const anfIds = new Set(reuniao.anfitrioes.map(a => a.contactId));
+    let contactIds: string[] = [];
+    if (mode === "anfitrioes") {
+      contactIds = reuniao.anfitrioes.map(a => a.contactId);
+    } else if (mode === "presentes") {
+      contactIds = reuniao.presentes.filter(p => p.contactId && !anfIds.has(p.contactId)).map(p => p.contactId!);
+    } else {
+      // all
+      contactIds = reuniao.presentes.filter(p => p.contactId).map(p => p.contactId!);
+    }
+    contactIds = Array.from(new Set(contactIds));
+    if (contactIds.length === 0) return NextResponse.json({ error: "Nenhum contato encontrado para o modo selecionado" }, { status: 400 });
+
+    const labelMode = mode === "anfitrioes" ? "Anfitriões" : mode === "presentes" ? "Presentes" : "Todos";
+    const groupName = `[Reunião] ${reuniao.titulo} — ${labelMode}`;
+
+    const newGroup = await prisma.contactGroup.create({
+      data: {
+        name: groupName,
+        description: `Disparo gerado a partir da reunião de ${new Date(reuniao.dataHora).toLocaleDateString("pt-BR")}`,
+        members: { create: contactIds.map(id => ({ contactId: id })) },
+      },
+    });
+    groupId = newGroup.id;
+  }
 
   const group = await prisma.contactGroup.findUnique({
     where: { id: groupId },

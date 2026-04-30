@@ -13,31 +13,61 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
   FAILED:   { label: "Falhou",    color: "text-red-500",   icon: XCircle },
 };
 
-function NewDispatchModal({ groups, onClose, onSent }: any) {
+function NewDispatchModal({ groups, reunioes, onClose, onSent }: any) {
+  const [origem, setOrigem]   = useState<"grupo" | "reuniao">("grupo");
   const [groupId, setGroupId] = useState("");
+  const [reuniaoId, setReuniaoId] = useState("");
+  const [reuniaoMode, setReuniaoMode] = useState<"all" | "anfitrioes" | "presentes">("all");
   const [message, setMessage] = useState("");
-  const [delay, setDelay] = useState(2000);
+  const [delay, setDelay]     = useState(2000);
   const [preview, setPreview] = useState<any | null>(null);
   const [sending, setSending] = useState(false);
 
   async function loadPreview() {
-    if (!groupId) return;
-    const r = await fetch(`/api/groups/${groupId}`);
-    setPreview(await r.json());
+    if (origem === "grupo" && groupId) {
+      const r = await fetch(`/api/groups/${groupId}`);
+      setPreview(await r.json());
+    } else if (origem === "reuniao" && reuniaoId) {
+      const r = await fetch(`/api/reunioes/${reuniaoId}`);
+      const reuniao = await r.json();
+      const anfIds = new Set(reuniao.anfitrioes?.map((a: any) => a.contactId) ?? []);
+      let members: any[] = [];
+      if (reuniaoMode === "anfitrioes") {
+        members = (reuniao.anfitrioes ?? []).map((a: any) => ({ contactId: a.contactId, contact: a.contact }));
+      } else if (reuniaoMode === "presentes") {
+        members = (reuniao.presentes ?? [])
+          .filter((p: any) => p.contactId && !anfIds.has(p.contactId))
+          .map((p: any) => ({ contactId: p.contactId, contact: p.contact }));
+      } else {
+        members = (reuniao.presentes ?? [])
+          .filter((p: any) => p.contactId)
+          .map((p: any) => ({ contactId: p.contactId, contact: p.contact }));
+      }
+      setPreview({ name: reuniao.titulo, members });
+    } else {
+      setPreview(null);
+    }
   }
 
-  useEffect(() => { loadPreview(); }, [groupId]);
+  useEffect(() => { loadPreview(); }, [origem, groupId, reuniaoId, reuniaoMode]);
 
   async function send() {
-    if (!groupId || !message.trim()) { toast.error("Selecione um grupo e escreva a mensagem"); return; }
+    if (!message.trim()) { toast.error("Escreva a mensagem"); return; }
+    if (origem === "grupo" && !groupId) { toast.error("Selecione um grupo"); return; }
+    if (origem === "reuniao" && !reuniaoId) { toast.error("Selecione uma reunião"); return; }
     setSending(true);
     try {
+      const body: any = { message, delayMs: delay };
+      if (origem === "grupo") body.groupId = groupId;
+      else { body.reuniaoId = reuniaoId; body.mode = reuniaoMode; }
+
       const r = await fetch("/api/dispatch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId, message, delayMs: delay }),
+        body: JSON.stringify(body),
       });
       const d = await r.json();
+      if (!r.ok) { toast.error(d.error ?? "Erro ao iniciar disparo"); return; }
       toast.success(`Disparo iniciado para ${d.total} contatos!`);
       onSent(); onClose();
     } catch { toast.error("Erro ao iniciar disparo"); }
@@ -47,20 +77,65 @@ function NewDispatchModal({ groups, onClose, onSent }: any) {
   return (
     <Modal open title="Novo Disparo em Massa" onClose={onClose} size="lg">
       <div className="flex flex-col gap-5">
+        {/* Toggle origem */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Grupo de contatos *</label>
-          <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <option value="">Selecione um grupo...</option>
-            {groups.map((g: any) => <option key={g.id} value={g.id}>{g.name} ({g._count?.members ?? 0} contatos)</option>)}
-          </select>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Origem</label>
+          <div className="flex gap-1.5">
+            {(["grupo", "reuniao"] as const).map(m => (
+              <button key={m} type="button" onClick={() => { setOrigem(m); setPreview(null); }}
+                className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${origem === m ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
+                {m === "grupo" ? "Grupo" : "Reunião"}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {origem === "grupo" ? (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Grupo de contatos *</label>
+            <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">Selecione um grupo...</option>
+              {groups.map((g: any) => <option key={g.id} value={g.id}>{g.name} ({g._count?.members ?? 0} contatos)</option>)}
+            </select>
+          </div>
+        ) : (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Reunião *</label>
+              <select value={reuniaoId} onChange={(e) => setReuniaoId(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="">Selecione uma reunião...</option>
+                {reunioes.map((r: any) => (
+                  <option key={r.id} value={r.id}>
+                    {r.titulo} — {format(new Date(r.dataHora), "dd/MM/yyyy", { locale: ptBR })} ({r._count?.presentes ?? 0} presentes)
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Enviar para</label>
+              <div className="flex gap-1.5 flex-wrap">
+                {([
+                  { key: "all", label: "Todos os presentes" },
+                  { key: "anfitrioes", label: "Apenas anfitriões" },
+                  { key: "presentes", label: "Presentes (sem anfitriões)" },
+                ] as const).map(opt => (
+                  <button key={opt.key} type="button" onClick={() => setReuniaoMode(opt.key)}
+                    className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${reuniaoMode === opt.key ? "bg-indigo-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Anfitriões e demais presentes podem receber mensagens diferentes — escolha um modo por disparo.</p>
+            </div>
+          </>
+        )}
 
         {preview && (
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
             <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><Users size={14} /> Destinatários ({preview.members?.length ?? 0})</p>
             <div className="max-h-32 overflow-y-auto space-y-1">
               {preview.members?.map((m: any) => (
-                <p key={m.contactId} className="text-xs text-gray-600">{m.contact.name} — {m.contact.phone}</p>
+                <p key={m.contactId} className="text-xs text-gray-600">{m.contact?.name ?? "—"} — {m.contact?.phone ?? ""}</p>
               ))}
             </div>
           </div>
@@ -85,7 +160,9 @@ function NewDispatchModal({ groups, onClose, onSent }: any) {
 
         <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
-          <button onClick={send} disabled={sending || !groupId || !message.trim()} className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 rounded-lg font-medium">
+          <button onClick={send}
+            disabled={sending || !message.trim() || (origem === "grupo" ? !groupId : !reuniaoId)}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 rounded-lg font-medium">
             <Send size={15} />{sending ? "Iniciando..." : "Iniciar Disparo"}
           </button>
         </div>
@@ -132,12 +209,17 @@ function DispatchResultModal({ dispatch, onClose }: any) {
 export default function DisparosPage() {
   const [dispatches, setDispatches] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
+  const [reunioes, setReunioes] = useState<any[]>([]);
   const [modal, setModal] = useState<"new" | "result" | null>(null);
   const [selected, setSelected] = useState<any | null>(null);
 
   const load = useCallback(async () => {
-    const [d, g] = await Promise.all([fetch("/api/dispatch").then((r) => r.json()), fetch("/api/groups").then((r) => r.json())]);
-    setDispatches(d); setGroups(g);
+    const [d, g, r] = await Promise.all([
+      fetch("/api/dispatch").then((r) => r.json()),
+      fetch("/api/groups").then((r) => r.json()),
+      fetch("/api/reunioes").then((r) => r.json()),
+    ]);
+    setDispatches(d); setGroups(g); setReunioes(r);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -185,7 +267,7 @@ export default function DisparosPage() {
         )}
       </div>
 
-      {modal === "new" && <NewDispatchModal groups={groups} onClose={() => setModal(null)} onSent={load} />}
+      {modal === "new" && <NewDispatchModal groups={groups} reunioes={reunioes} onClose={() => setModal(null)} onSent={load} />}
       {modal === "result" && selected && <DispatchResultModal dispatch={selected} onClose={() => setModal(null)} />}
     </div>
   );

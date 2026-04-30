@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcast } from "@/lib/sse";
+import { resolveContactIds } from "@/lib/reunioes";
 
 export const dynamic = "force-dynamic";
 
@@ -30,51 +31,39 @@ export async function POST(req: NextRequest) {
   const {
     titulo, dataHora, local, bairro, zona, status, notes,
     liderId,
-    anfitriaoIds = [],
-    presentes = [],      // [{ contactId?, nome?, telefone? }]
-    avaliacoes = [],     // [{ slot, avaliadorId?, avaliadorNome?, atencao, interacao, obs? }]
+    anfitrioes = [],     // [{ contactId?, nome?, telefone? }]
+    presentes  = [],     // [{ contactId?, nome?, telefone? }]
+    avaliacoes = [],     // [{ slot, avaliadorId?, avaliadorNome?, atencao, interacao }]
   } = body;
 
   if (!titulo?.trim() || !dataHora) {
     return NextResponse.json({ error: "Título e data são obrigatórios" }, { status: 400 });
   }
 
-  // Para entradas manuais sem contactId, cria o contato ligado ao líder
   const defaultRole = await prisma.personRole.findFirst({ orderBy: { level: "desc" } });
-  const presenteData = await Promise.all(
-    presentes.map(async (p: any) => {
-      if (p.contactId) return { contactId: p.contactId };
-      if (!p.telefone?.trim()) return null;
-      const phone = p.telefone.replace(/\D/g, "");
-      let contact = await prisma.contact.findFirst({ where: { phone } });
-      if (!contact && defaultRole) {
-        contact = await prisma.contact.create({
-          data: {
-            name: p.nome?.trim() || phone,
-            phone,
-            roleId: defaultRole.id,
-            source: "reuniao",
-            parentId: liderId || null,
-          },
-        });
-      }
-      return contact ? { contactId: contact.id } : { nome: p.nome, telefone: p.telefone };
-    })
-  );
+  const defaultRoleId = defaultRole?.id ?? null;
+
+  // Resolve anfitriões e presentes em contactIds (cria novos quando manuais)
+  const anfIds  = await resolveContactIds(anfitrioes, liderId, defaultRoleId);
+  const presIds = await resolveContactIds(presentes,  liderId, defaultRoleId);
+
+  // Dedup anfitriões para evitar duplicatas
+  const uniqAnfIds = Array.from(new Set(anfIds));
+  // Dedup presentes
+  const uniqPresIds = Array.from(new Set(presIds));
 
   const reuniao = await prisma.reuniao.create({
     data: {
       titulo: titulo.trim(), dataHora: new Date(dataHora), local, bairro, zona,
       status: status ?? "REALIZADA", notes,
       liderId: liderId || null,
-      anfitrioes: { create: anfitriaoIds.map((id: string) => ({ contactId: id })) },
-      presentes:  { create: presenteData.filter(Boolean) as any[] },
+      anfitrioes: { create: uniqAnfIds.map(id => ({ contactId: id })) },
+      presentes:  { create: uniqPresIds.map(id => ({ contactId: id })) },
       avaliacoes: {
         create: avaliacoes
           .filter((a: any) => a.avaliadorId || a.avaliadorNome)
           .map((a: any) => ({
             slot: a.slot, atencao: a.atencao ?? 0, interacao: a.interacao ?? 0,
-            obs: a.obs || null,
             avaliadorId:   a.avaliadorId   || null,
             avaliadorNome: a.avaliadorNome || null,
           })),
