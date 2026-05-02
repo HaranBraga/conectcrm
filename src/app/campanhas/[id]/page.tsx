@@ -4,19 +4,12 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Send, Settings, Users, Clock, CheckCheck, Plus, Trash2,
-  Search, X, Image as ImageIcon, Video, Link2, Eye, MessageSquare, Tag, Save,
+  Search, X, Image as ImageIcon, Video, Link2, MessageSquare, Tag, Save,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
-
-const STATUS_LABEL: Record<string, string> = {
-  PENDENTE:  "Pendente",
-  ENVIADO:   "Enviado",
-  RESPONDEU: "Respondeu",
-  IGNOROU:   "Ignorou",
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -488,7 +481,8 @@ function ContactRow({ cc, campaign, tags, onSend, onPatch, onDelete }: any) {
 // ─── Página ──────────────────────────────────────────────────────────────────
 
 export default function CampanhaDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams();
+  const id = (params?.id ?? "") as string;
   const [campaign, setCampaign] = useState<any | null>(null);
   const [contacts, setContacts] = useState<any[]>([]);
   const [tab, setTab] = useState<"PENDENTE" | "ENVIADO" | "CONFIG">("PENDENTE");

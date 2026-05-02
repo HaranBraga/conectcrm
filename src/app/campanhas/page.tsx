@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Send, Plus, Users, CheckCheck, Clock, Pause, Trash2, Search } from "lucide-react";
+import { Send, Plus, Users, CheckCheck, Clock, Trash2, Search } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import toast from "react-hot-toast";
 
