@@ -10,6 +10,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     include: {
       responseTags: { orderBy: { order: "asc" } },
       _count: { select: { contacts: true } },
+      reuniaoOrigin: { select: { id: true, titulo: true, dataHora: true } },
     },
   });
   if (!campaign) return NextResponse.json({ error: "Campanha não encontrada" }, { status: 404 });

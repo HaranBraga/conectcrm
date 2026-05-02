@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Search, Calendar, MapPin, Users, Megaphone } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Search, Calendar, MapPin, Users, Megaphone, Home, ArrowRight } from "lucide-react";
 import { CampanhasTabs } from "@/components/ui/CampanhasTabs";
-import { Modal } from "@/components/ui/Modal";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
@@ -13,72 +14,13 @@ const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> =
   CANCELADA: { label: "Cancelada", color: "#dc2626", bg: "#fee2e2" },
 };
 
-function AddToCampaignModal({ reuniao, campaigns, onClose, onAdded }: any) {
-  const [campaignId, setCampaignId] = useState("");
-  const [mode, setMode] = useState<"all" | "anfitrioes" | "presentes">("all");
-  const [saving, setSaving] = useState(false);
-
-  async function add() {
-    if (!campaignId) { toast.error("Selecione uma campanha"); return; }
-    setSaving(true);
-    try {
-      const r = await fetch(`/api/campaigns/${campaignId}/contacts`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reuniaoId: reuniao.id, mode }),
-      });
-      if (!r.ok) { const d = await r.json(); toast.error(d.error ?? "Erro"); return; }
-      const d = await r.json();
-      toast.success(`${d.added} contatos adicionados${d.skipped ? ` · ${d.skipped} já estavam` : ""}`);
-      onAdded(); onClose();
-    } finally { setSaving(false); }
-  }
-
-  return (
-    <Modal open title={`Adicionar contatos de "${reuniao.titulo}"`} onClose={onClose} size="md">
-      <div className="flex flex-col gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Campanha de destino</label>
-          <select value={campaignId} onChange={e => setCampaignId(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-            <option value="">Selecione uma campanha...</option>
-            {campaigns.map((c: any) => (
-              <option key={c.id} value={c.id}>{c.name} ({c.counts?.PENDENTE ?? 0} pendentes)</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Quem incluir</label>
-          <div className="flex gap-1.5 flex-wrap">
-            {([
-              { key: "all", label: "Todos os presentes" },
-              { key: "anfitrioes", label: "Apenas anfitriões" },
-              { key: "presentes", label: "Presentes (sem anfitriões)" },
-            ] as const).map(opt => (
-              <button key={opt.key} type="button" onClick={() => setMode(opt.key)}
-                className={`text-xs px-3 py-1.5 rounded-full border font-medium ${mode === opt.key ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
-          <button onClick={add} disabled={saving || !campaignId}
-            className="px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 rounded-lg font-medium">
-            {saving ? "Adicionando..." : "Adicionar"}
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 export default function CampanhasReunioesPage() {
+  const router = useRouter();
   const [reunioes, setReunioes] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
-  const [picked, setPicked] = useState<any | null>(null);
+  const [creating, setCreating] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [rr, cc] = await Promise.all([
@@ -89,6 +31,32 @@ export default function CampanhasReunioesPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Mapa: reuniaoId → lista de campanhas existentes daquela reunião
+  const campaignsByReuniao = useMemo(() => {
+    const map = new Map<string, any[]>();
+    campaigns.forEach(c => {
+      if (c.reuniaoOrigin?.id) {
+        if (!map.has(c.reuniaoOrigin.id)) map.set(c.reuniaoOrigin.id, []);
+        map.get(c.reuniaoOrigin.id)!.push(c);
+      }
+    });
+    return map;
+  }, [campaigns]);
+
+  async function startDispatch(reuniao: any, mode: "anfitrioes" | "presentes" | "all") {
+    setCreating(reuniao.id + mode);
+    try {
+      const r = await fetch("/api/campaigns/from-reuniao", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reuniaoId: reuniao.id, mode }),
+      });
+      if (!r.ok) { const d = await r.json(); toast.error(d.error ?? "Erro"); return; }
+      const d = await r.json();
+      toast.success(`Campanha criada com ${d.addedContacts} contato(s)`);
+      router.push(`/campanhas/${d.id}`);
+    } finally { setCreating(null); }
+  }
 
   const filtered = useMemo(() => reunioes.filter(r => {
     if (statusFilter && r.status !== statusFilter) return false;
@@ -139,9 +107,11 @@ export default function CampanhasReunioesPage() {
               const st = STATUS_CFG[r.status] ?? STATUS_CFG.REALIZADA;
               const totPres = r._count?.presentes ?? 0;
               const totAnf  = r.anfitrioes?.length ?? 0;
+              const totSemAnf = Math.max(0, totPres - totAnf);
+              const existingCampaigns = campaignsByReuniao.get(r.id) ?? [];
               return (
                 <div key={r.id} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-sm transition-shadow">
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start gap-4 mb-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <h2 className="font-semibold text-gray-900 text-sm">{r.titulo}</h2>
@@ -155,20 +125,55 @@ export default function CampanhasReunioesPage() {
                         {r.lider && <span>Líder: {r.lider.name}</span>}
                       </div>
                     </div>
-                    <button onClick={() => setPicked(r)}
-                      disabled={totPres === 0 && totAnf === 0}
-                      className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg text-xs font-medium shrink-0">
-                      <Megaphone size={13} /> Adicionar a campanha
+                  </div>
+
+                  {/* Botões de disparo */}
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => startDispatch(r, "anfitrioes")} disabled={totAnf === 0 || creating === r.id + "anfitrioes"}
+                      className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
+                      <Home size={12} />
+                      {creating === r.id + "anfitrioes" ? "Criando..." : `Disparo Anfitriões (${totAnf})`}
+                      <ArrowRight size={11} />
+                    </button>
+                    <button onClick={() => startDispatch(r, "presentes")} disabled={totSemAnf === 0 || creating === r.id + "presentes"}
+                      className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-800 border border-indigo-200 hover:bg-indigo-100 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
+                      <Users size={12} />
+                      {creating === r.id + "presentes" ? "Criando..." : `Disparo Presentes (${totSemAnf})`}
+                      <ArrowRight size={11} />
+                    </button>
+                    <button onClick={() => startDispatch(r, "all")} disabled={totPres === 0 || creating === r.id + "all"}
+                      className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-brand-50 text-brand-800 border border-brand-200 hover:bg-brand-100 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
+                      <Megaphone size={12} />
+                      {creating === r.id + "all" ? "Criando..." : `Disparo Todos (${totPres})`}
+                      <ArrowRight size={11} />
                     </button>
                   </div>
+
+                  {existingCampaigns.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-[10px] uppercase font-semibold text-gray-400 mb-1.5">Disparos já criados desta reunião</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {existingCampaigns.map(c => {
+                          const pend = c.counts?.PENDENTE ?? 0;
+                          const env  = (c.counts?.ENVIADO ?? 0) + (c.counts?.RESPONDEU ?? 0);
+                          return (
+                            <Link key={c.id} href={`/campanhas/${c.id}`}
+                              className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-white border border-gray-200 hover:border-brand-300">
+                              <span className="font-medium text-gray-700">{c.name.replace(`Reunião: ${r.titulo} — `, "")}</span>
+                              <span className="text-[10px] text-gray-400">{env}/{c._count?.contacts ?? 0}</span>
+                              {pend > 0 && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{pend} pendentes</span>}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
       </div>
-
-      {picked && <AddToCampaignModal reuniao={picked} campaigns={campaigns} onClose={() => setPicked(null)} onAdded={load} />}
     </div>
   );
 }

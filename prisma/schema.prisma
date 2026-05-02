@@ -275,6 +275,7 @@ model Reuniao {
   presentes  ReuniaoPresente[]
   avaliacoes ReuniaoAvaliacao[]
   conversas  Conversation[]     @relation("ReuniaoConversas")
+  campaigns  Campaign[]         @relation("CampaignReuniaoOrigin")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -341,6 +342,10 @@ model Campaign {
   linkUrl         String?                         // link com prévia
   defaultDelayMs  Int      @default(2000)         // intervalo entre envios em modo lote (futuro)
 
+  reuniaoOriginId String?
+  reuniaoOrigin   Reuniao? @relation("CampaignReuniaoOrigin", fields: [reuniaoOriginId], references: [id], onDelete: SetNull)
+  reuniaoMode     String?                          // anfitrioes | presentes | all (quando origem é reunião)
+
   contacts        CampaignContact[]
   responseTags    CampaignResponseTag[]
 
@@ -348,6 +353,7 @@ model Campaign {
   updatedAt       DateTime @updatedAt
 
   @@index([status])
+  @@index([reuniaoOriginId])
 }
 
 model CampaignContact {

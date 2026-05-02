@@ -146,6 +146,11 @@ export default function CampanhasPage() {
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex-1 min-w-0">
                       <h2 className="font-semibold text-gray-900 truncate">{c.name}</h2>
+                      {c.reuniaoOrigin && (
+                        <p className="text-[11px] text-amber-700 mt-0.5 truncate">
+                          <Users size={10} className="inline mr-1" />Reunião: {c.reuniaoOrigin.titulo}
+                        </p>
+                      )}
                       {c.goal && <p className="text-xs text-gray-500 mt-0.5 truncate">{c.goal}</p>}
                     </div>
                     <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0"

@@ -512,7 +512,70 @@ function BatchSendModal({ campaign, totalPendentes, onClose, onStarted }: any) {
   );
 }
 
-// (Envio individual removido — apenas envio em lote agora)
+// ─── Modal de envio individual (útil para anfitriões / casos pontuais) ──────
+
+function SendOneModal({ cc, campaign, onClose, onSent }: any) {
+  const [msg, setMsg] = useState("");
+  const [sending, setSending] = useState(false);
+
+  function resolvePreview(t: string) {
+    const first = (s?: string | null) => (s ? s.trim().split(/\s+/)[0] : "");
+    const map: Record<string, string> = {
+      nome:          cc.contact?.name ?? "",
+      primeiroNome:  first(cc.contact?.name),
+      telefone:      cc.contact?.phone ?? "",
+      lider:         cc.assignedTo?.name ?? cc.contact?.parent?.name ?? "",
+      primeiroLider: first(cc.assignedTo?.name ?? cc.contact?.parent?.name),
+    };
+    return t.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => map[k] ?? "");
+  }
+
+  useEffect(() => { setMsg(resolvePreview(campaign.messageTemplate)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [cc, campaign.messageTemplate]);
+
+  async function send() {
+    setSending(true);
+    try {
+      const r = await fetch(`/api/campaigns/${campaign.id}/contacts/${cc.id}/send`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ overrideMessage: msg }),
+      });
+      if (!r.ok) { const d = await r.json(); toast.error(d.error ?? "Erro ao enviar"); return; }
+      toast.success("Mensagem enviada");
+      onSent(); onClose();
+    } finally { setSending(false); }
+  }
+
+  return (
+    <Modal open title={`Enviar para ${cc.contact.name}`} onClose={onClose} size="lg">
+      <div className="flex flex-col gap-4">
+        <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
+          <p><strong>Telefone:</strong> {cc.contact.phone}</p>
+          {(cc.assignedTo?.name || cc.contact?.parent?.name) && (
+            <p><strong>Líder:</strong> {cc.assignedTo?.name ?? cc.contact?.parent?.name}</p>
+          )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Mensagem (já personalizada — pode editar)</label>
+          <textarea rows={6} value={msg} onChange={e => setMsg(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none" />
+        </div>
+        {campaign.mediaUrl && (
+          <p className="text-xs text-gray-500">Mídia anexada da campanha será enviada junto.</p>
+        )}
+        {campaign.linkUrl && (
+          <p className="text-xs text-gray-500">Link da campanha será incluído: {campaign.linkUrl}</p>
+        )}
+        <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+          <button onClick={send} disabled={sending || !msg.trim()}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 rounded-lg font-medium">
+            <Send size={14} /> {sending ? "Enviando..." : "Enviar agora"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 // ─── Configuração ────────────────────────────────────────────────────────────
 
@@ -726,7 +789,7 @@ function ConfigTab({ campaign, onSaved }: any) {
 
 // ─── Linha de contato ────────────────────────────────────────────────────────
 
-function ContactRow({ cc, campaign, tags, onPatch, onDelete }: any) {
+function ContactRow({ cc, campaign, tags, onSend, onPatch, onDelete }: any) {
   const router = useRouter();
   const [showTags, setShowTags] = useState(false);
   const tagRef = useRef<HTMLDivElement>(null);
@@ -775,7 +838,11 @@ function ContactRow({ cc, campaign, tags, onPatch, onDelete }: any) {
       )}
 
       {cc.status === "PENDENTE" && (
-        <span className="text-[11px] text-gray-400 shrink-0">aguardando lote</span>
+        <button onClick={() => onSend(cc)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-medium shrink-0"
+          title="Enviar individualmente">
+          <Send size={12} /> Enviar
+        </button>
       )}
 
       {cc.status !== "PENDENTE" && tags.length > 0 && (
@@ -828,6 +895,7 @@ export default function CampanhaDetailPage() {
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
+  const [sendCc, setSendCc] = useState<any | null>(null);
 
   const loadCampaign = useCallback(async () => {
     const r = await fetch(`/api/campaigns/${id}`);
@@ -882,7 +950,15 @@ export default function CampanhaDetailPage() {
             <ArrowLeft size={18} />
           </Link>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-gray-900 truncate">{campaign.name}</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold text-gray-900 truncate">{campaign.name}</h1>
+              {campaign.reuniaoOrigin && (
+                <Link href={`/campanhas/reunioes`}
+                  className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100">
+                  <Users size={10} /> Reunião: {campaign.reuniaoOrigin.titulo}
+                </Link>
+              )}
+            </div>
             {campaign.goal && <p className="text-sm text-gray-500 truncate">{campaign.goal}</p>}
           </div>
           {(campaign.counts?.PENDENTE ?? 0) > 0 && (
@@ -944,7 +1020,7 @@ export default function CampanhaDetailPage() {
                 <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
                   {pendentes.filter(filterFn).map(cc => (
                     <ContactRow key={cc.id} cc={cc} campaign={campaign} tags={campaign.responseTags ?? []}
-                      onPatch={patchContact} onDelete={deleteContact} />
+                      onSend={setSendCc} onPatch={patchContact} onDelete={deleteContact} />
                   ))}
                 </div>
               </>
@@ -963,7 +1039,7 @@ export default function CampanhaDetailPage() {
               <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
                 {processados.filter(filterFn).map(cc => (
                   <ContactRow key={cc.id} cc={cc} campaign={campaign} tags={campaign.responseTags ?? []}
-                    onPatch={patchContact} onDelete={deleteContact} />
+                    onSend={setSendCc} onPatch={patchContact} onDelete={deleteContact} />
                 ))}
               </div>
             )}
@@ -979,6 +1055,7 @@ export default function CampanhaDetailPage() {
 
       {addOpen && <AddContactsModal campaignId={id} onClose={() => setAddOpen(false)} onAdded={() => { loadContacts(); loadCampaign(); }} />}
       {batchOpen && <BatchSendModal campaign={campaign} totalPendentes={campaign.counts?.PENDENTE ?? 0} onClose={() => setBatchOpen(false)} onStarted={() => { loadContacts(); loadCampaign(); }} />}
+      {sendCc && <SendOneModal cc={sendCc} campaign={campaign} onClose={() => setSendCc(null)} onSent={() => { loadContacts(); loadCampaign(); }} />}
     </div>
   );
 }

@@ -16,6 +16,7 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { contacts: true } },
+      reuniaoOrigin: { select: { id: true, titulo: true, dataHora: true } },
     },
   });
   // Computa contagens por status
