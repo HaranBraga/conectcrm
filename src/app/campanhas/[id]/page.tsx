@@ -73,32 +73,97 @@ function ContactSearch({ onSelect, placeholder = "Buscar contato..." }: { onSele
 
 // ─── Adicionar contatos ──────────────────────────────────────────────────────
 
+function MultiToggle({ options, selected, onToggle }: {
+  options: { value: string; label: string; count?: number; color?: string; bgColor?: string }[];
+  selected: string[];
+  onToggle: (v: string) => void;
+}) {
+  if (options.length === 0) return <p className="text-xs text-gray-400 italic">Nenhuma opção</p>;
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {options.map(opt => {
+        const isOn = selected.includes(opt.value);
+        return (
+          <button key={opt.value} type="button" onClick={() => onToggle(opt.value)}
+            className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${isOn ? "bg-brand-600 text-white border-transparent" : "text-gray-600 border-gray-200 bg-white hover:border-brand-300"}`}
+            style={isOn && opt.color ? { backgroundColor: opt.color, color: "#fff" } : {}}>
+            {opt.label}{opt.count !== undefined && <span className="opacity-60 ml-1">{opt.count}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function AddContactsModal({ campaignId, onClose, onAdded }: any) {
-  const [origem, setOrigem] = useState<"manual" | "grupo" | "reuniao">("manual");
-  const [groups, setGroups] = useState<any[]>([]);
+  const [origem, setOrigem] = useState<"criterio" | "manual" | "reuniao">("criterio");
   const [reunioes, setReunioes] = useState<any[]>([]);
-  const [groupId, setGroupId] = useState("");
   const [reuniaoId, setReuniaoId] = useState("");
   const [reuniaoMode, setReuniaoMode] = useState<"all" | "anfitrioes" | "presentes">("all");
   const [picked, setPicked] = useState<any[]>([]);
+
+  // Critério
+  const [opts, setOpts] = useState<any | null>(null);
+  const [roleKeys, setRoleKeys] = useState<string[]>([]);
+  const [zonas, setZonas]       = useState<string[]>([]);
+  const [cidades, setCidades]   = useState<string[]>([]);
+  const [sources, setSources]   = useState<string[]>([]);
+  const [excludeInAnyCampaign, setExcludeInAnyCampaign] = useState(false);
+
+  const [preview, setPreview] = useState<{ total: number; novos: number; jaNaCampanha: number } | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const previewTimer = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-    fetch("/api/groups").then(r => r.json()).then(setGroups);
     fetch("/api/reunioes").then(r => r.json()).then(setReunioes);
+    fetch("/api/contacts/filter-options").then(r => r.json()).then(setOpts);
   }, []);
+
+  function buildBody() {
+    const body: any = {};
+    if (origem === "manual")  body.contactIds = picked.map(p => p.id);
+    if (origem === "reuniao") { body.reuniaoId = reuniaoId; body.mode = reuniaoMode; }
+    if (origem === "criterio") {
+      if (roleKeys.length) body.roleKeys = roleKeys;
+      if (zonas.length)    body.zonas    = zonas;
+      if (cidades.length)  body.cidades  = cidades;
+      if (sources.length)  body.sources  = sources;
+      body.excludeInAnyCampaign = excludeInAnyCampaign;
+    }
+    return body;
+  }
+
+  // Auto-preview 350ms após mudar critério
+  useEffect(() => {
+    clearTimeout(previewTimer.current);
+    if (origem === "manual") { setPreview(null); return; }
+    if (origem === "reuniao" && !reuniaoId) { setPreview(null); return; }
+    if (origem === "criterio" && roleKeys.length === 0 && zonas.length === 0 && cidades.length === 0 && sources.length === 0) {
+      setPreview(null); return;
+    }
+    previewTimer.current = setTimeout(async () => {
+      setPreviewing(true);
+      try {
+        const r = await fetch(`/api/campaigns/${campaignId}/contacts/preview`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildBody()),
+        });
+        setPreview(await r.json());
+      } finally { setPreviewing(false); }
+    }, 350);
+    return () => clearTimeout(previewTimer.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [origem, reuniaoId, reuniaoMode, roleKeys, zonas, cidades, sources, excludeInAnyCampaign]);
+
+  function toggle<T>(arr: T[], v: T): T[] { return arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]; }
 
   async function add() {
     setSaving(true);
     try {
-      const body: any = {};
-      if (origem === "manual") body.contactIds = picked.map(p => p.id);
-      else if (origem === "grupo")  body.groupId = groupId;
-      else                          { body.reuniaoId = reuniaoId; body.mode = reuniaoMode; }
-
       const r = await fetch(`/api/campaigns/${campaignId}/contacts`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(buildBody()),
       });
       if (!r.ok) { const d = await r.json(); toast.error(d.error ?? "Erro"); return; }
       const d = await r.json();
@@ -107,16 +172,23 @@ function AddContactsModal({ campaignId, onClose, onAdded }: any) {
     } finally { setSaving(false); }
   }
 
-  const canAdd = origem === "manual" ? picked.length > 0 : origem === "grupo" ? !!groupId : !!reuniaoId;
+  const canAdd =
+    origem === "manual"  ? picked.length > 0 :
+    origem === "reuniao" ? !!reuniaoId :
+                            (preview?.novos ?? 0) > 0;
 
   return (
     <Modal open title="Adicionar contatos à campanha" onClose={onClose} size="lg">
       <div className="flex flex-col gap-4">
         <div className="flex gap-1.5">
-          {(["manual", "grupo", "reuniao"] as const).map(m => (
-            <button key={m} type="button" onClick={() => setOrigem(m)}
-              className={`text-xs px-3 py-1.5 rounded-full border font-medium ${origem === m ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
-              {m === "manual" ? "Manual" : m === "grupo" ? "Por Grupo" : "Por Reunião"}
+          {([
+            { key: "criterio", label: "Por Critério" },
+            { key: "manual",   label: "Manual"        },
+            { key: "reuniao",  label: "Por Reunião"   },
+          ] as const).map(m => (
+            <button key={m.key} type="button" onClick={() => setOrigem(m.key)}
+              className={`text-xs px-3 py-1.5 rounded-full border font-medium ${origem === m.key ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
+              {m.label}
             </button>
           ))}
         </div>
@@ -128,7 +200,7 @@ function AddContactsModal({ campaignId, onClose, onAdded }: any) {
               setPicked(prev => [...prev, c]);
             }} placeholder="Buscar e adicionar contatos..." />
             {picked.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
                 {picked.map(c => (
                   <div key={c.id} className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-1">
                     <span className="text-xs text-indigo-900">{c.name}</span>
@@ -139,14 +211,6 @@ function AddContactsModal({ campaignId, onClose, onAdded }: any) {
               </div>
             )}
           </>
-        )}
-
-        {origem === "grupo" && (
-          <select value={groupId} onChange={e => setGroupId(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-            <option value="">Selecione um grupo...</option>
-            {groups.map(g => <option key={g.id} value={g.id}>{g.name} ({g._count?.members ?? 0})</option>)}
-          </select>
         )}
 
         {origem === "reuniao" && (
@@ -175,13 +239,164 @@ function AddContactsModal({ campaignId, onClose, onAdded }: any) {
           </>
         )}
 
-        <p className="text-xs text-gray-400">Contatos que já estão na campanha serão ignorados automaticamente.</p>
+        {origem === "criterio" && (
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-1.5">Papéis</p>
+              <MultiToggle
+                options={(opts?.roles ?? []).map((r: any) => ({ value: r.key, label: r.label, count: r.count, color: r.color, bgColor: r.bgColor }))}
+                selected={roleKeys}
+                onToggle={(v) => setRoleKeys(prev => toggle(prev, v))}
+              />
+            </div>
+            {(opts?.zonas ?? []).length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-1.5">Zonas</p>
+                <MultiToggle
+                  options={opts.zonas.map((z: any) => ({ value: z.value, label: z.value, count: z.count }))}
+                  selected={zonas}
+                  onToggle={(v) => setZonas(prev => toggle(prev, v))}
+                />
+              </div>
+            )}
+            {(opts?.cidades ?? []).length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-1.5">Cidades</p>
+                <MultiToggle
+                  options={opts.cidades.slice(0, 30).map((c: any) => ({ value: c.value, label: c.value, count: c.count }))}
+                  selected={cidades}
+                  onToggle={(v) => setCidades(prev => toggle(prev, v))}
+                />
+              </div>
+            )}
+            {(opts?.sources ?? []).length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-1.5">Origem</p>
+                <MultiToggle
+                  options={opts.sources.map((s: any) => ({ value: s.value, label: s.value, count: s.count }))}
+                  selected={sources}
+                  onToggle={(v) => setSources(prev => toggle(prev, v))}
+                />
+              </div>
+            )}
+            <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+              <input type="checkbox" checked={excludeInAnyCampaign} onChange={e => setExcludeInAnyCampaign(e.target.checked)}
+                className="rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+              Excluir contatos que já estão em <strong>outra</strong> campanha (evita sobrecarga)
+            </label>
+          </div>
+        )}
+
+        {/* Preview */}
+        {origem !== "manual" && (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+            {previewing ? (
+              <p className="text-xs text-gray-400">Calculando...</p>
+            ) : preview ? (
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex gap-3">
+                  <span className="text-gray-700"><strong className="text-brand-700 text-lg">{preview.novos}</strong> novos</span>
+                  {preview.jaNaCampanha > 0 && <span className="text-gray-400">{preview.jaNaCampanha} já estão</span>}
+                  <span className="text-gray-400">de {preview.total} encontrados</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400">Selecione critérios para ver quantos contatos serão adicionados</p>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
           <button onClick={add} disabled={!canAdd || saving}
             className="px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 rounded-lg font-medium">
-            {saving ? "Adicionando..." : "Adicionar"}
+            {saving ? "Adicionando..." : origem === "manual" ? `Adicionar ${picked.length}` : preview ? `Adicionar ${preview.novos}` : "Adicionar"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Modal de envio em LOTE ──────────────────────────────────────────────────
+
+function BatchSendModal({ campaign, totalPendentes, onClose, onStarted }: any) {
+  const [count, setCount] = useState(Math.min(50, totalPendentes));
+  const [delaySec, setDelaySec] = useState(3);
+  const [sending, setSending] = useState(false);
+
+  const minutes = Math.round((count * delaySec) / 60);
+
+  async function start() {
+    setSending(true);
+    try {
+      const r = await fetch(`/api/campaigns/${campaign.id}/batch-send`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ count, delayMs: delaySec * 1000 }),
+      });
+      if (!r.ok) { const d = await r.json(); toast.error(d.error ?? "Erro"); return; }
+      const d = await r.json();
+      toast.success(`Lote de ${d.batched} envios iniciado em background!`);
+      onStarted(); onClose();
+    } finally { setSending(false); }
+  }
+
+  return (
+    <Modal open title="Enviar lote" onClose={onClose} size="md">
+      <div className="flex flex-col gap-5">
+        <p className="text-sm text-gray-600">
+          Há <strong>{totalPendentes}</strong> contatos pendentes nesta campanha.
+        </p>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Quantos enviar agora?</label>
+          <div className="flex items-center gap-3">
+            <input type="number" min={1} max={totalPendentes} value={count}
+              onChange={e => setCount(Math.max(1, Math.min(totalPendentes, Number(e.target.value) || 1)))}
+              className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <input type="range" min={1} max={totalPendentes} value={count}
+              onChange={e => setCount(Number(e.target.value))}
+              className="flex-1 accent-brand-600" />
+          </div>
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            {[10, 50, 100, 250, 500, 1000].filter(n => n <= totalPendentes).map(n => (
+              <button key={n} onClick={() => setCount(n)}
+                className="text-xs px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-brand-300">
+                {n}
+              </button>
+            ))}
+            {totalPendentes <= 1000 && (
+              <button onClick={() => setCount(totalPendentes)}
+                className="text-xs px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-brand-300">
+                Todos ({totalPendentes})
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Intervalo entre envios</label>
+          <div className="flex gap-1.5 flex-wrap">
+            {[2, 3, 5, 8, 12, 20].map(s => (
+              <button key={s} onClick={() => setDelaySec(s)}
+                className={`text-xs px-3 py-1.5 rounded-full border font-medium ${delaySec === s ? "bg-brand-600 text-white border-transparent" : "text-gray-600 border-gray-200 bg-white"}`}>
+                {s}s
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Mais lento = menos risco de bloqueio do WhatsApp</p>
+        </div>
+
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-700">
+          <p>Estimativa: <strong>~{minutes} min</strong> para concluir o lote.</p>
+          <p className="mt-1">O envio roda em background — você pode fechar essa janela.</p>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+          <button onClick={start} disabled={sending || count < 1}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 rounded-lg font-medium">
+            <Send size={14} /> {sending ? "Iniciando..." : `Enviar ${count}`}
           </button>
         </div>
       </div>
@@ -486,9 +701,11 @@ export default function CampanhaDetailPage() {
   const id = (params?.id ?? "") as string;
   const [campaign, setCampaign] = useState<any | null>(null);
   const [contacts, setContacts] = useState<any[]>([]);
+  const [contactsTotal, setContactsTotal] = useState(0);
   const [tab, setTab] = useState<"PENDENTE" | "ENVIADO" | "CONFIG">("PENDENTE");
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+  const [batchOpen, setBatchOpen] = useState(false);
   const [sendCc, setSendCc] = useState<any | null>(null);
 
   const loadCampaign = useCallback(async () => {
@@ -497,8 +714,10 @@ export default function CampanhaDetailPage() {
   }, [id]);
 
   const loadContacts = useCallback(async () => {
-    const r = await fetch(`/api/campaigns/${id}/contacts`);
-    setContacts(await r.json());
+    const r = await fetch(`/api/campaigns/${id}/contacts?limit=500`);
+    const d = await r.json();
+    setContacts(d.items ?? []);
+    setContactsTotal(d.total ?? 0);
   }, [id]);
 
   useEffect(() => { loadCampaign(); loadContacts(); }, [loadCampaign, loadContacts]);
@@ -545,6 +764,12 @@ export default function CampanhaDetailPage() {
             <h1 className="text-xl font-bold text-gray-900 truncate">{campaign.name}</h1>
             {campaign.goal && <p className="text-sm text-gray-500 truncate">{campaign.goal}</p>}
           </div>
+          {(campaign.counts?.PENDENTE ?? 0) > 0 && (
+            <button onClick={() => setBatchOpen(true)}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+              <Send size={15} /> Enviar lote
+            </button>
+          )}
           <button onClick={() => setAddOpen(true)}
             className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
             <Plus size={15} /> Adicionar contatos
@@ -589,12 +814,19 @@ export default function CampanhaDetailPage() {
                 <p className="text-sm mt-1">Adicione contatos para começar a campanha</p>
               </div>
             ) : (
-              <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
-                {pendentes.filter(filterFn).map(cc => (
-                  <ContactRow key={cc.id} cc={cc} campaign={campaign} tags={campaign.responseTags ?? []}
-                    onSend={setSendCc} onPatch={patchContact} onDelete={deleteContact} />
-                ))}
-              </div>
+              <>
+                {contactsTotal > contacts.length && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs text-amber-700">
+                    Mostrando {contacts.length} de {contactsTotal} contatos. Use a busca para filtrar ou envie em lote.
+                  </div>
+                )}
+                <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
+                  {pendentes.filter(filterFn).map(cc => (
+                    <ContactRow key={cc.id} cc={cc} campaign={campaign} tags={campaign.responseTags ?? []}
+                      onSend={setSendCc} onPatch={patchContact} onDelete={deleteContact} />
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -625,6 +857,7 @@ export default function CampanhaDetailPage() {
       </div>
 
       {addOpen && <AddContactsModal campaignId={id} onClose={() => setAddOpen(false)} onAdded={() => { loadContacts(); loadCampaign(); }} />}
+      {batchOpen && <BatchSendModal campaign={campaign} totalPendentes={campaign.counts?.PENDENTE ?? 0} onClose={() => setBatchOpen(false)} onStarted={() => { loadContacts(); loadCampaign(); }} />}
       {sendCc && <SendModal cc={sendCc} campaign={campaign} onClose={() => setSendCc(null)} onSent={() => { loadContacts(); loadCampaign(); }} />}
     </div>
   );

@@ -7,41 +7,57 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status"); // PENDENTE | ENVIADO | RESPONDEU | IGNOROU
+  const search = searchParams.get("search") ?? "";
+  const limit  = Math.min(Number(searchParams.get("limit") ?? 200), 500);
+  const offset = Number(searchParams.get("offset") ?? 0);
 
   const where: any = { campaignId: params.id };
   if (status) where.status = status;
+  if (search.trim()) {
+    where.contact = {
+      OR: [
+        { name:  { contains: search, mode: "insensitive" } },
+        { phone: { contains: search } },
+      ],
+    };
+  }
 
-  const items = await prisma.campaignContact.findMany({
-    where,
-    include: {
-      contact:    { select: { id: true, name: true, phone: true, role: true, parent: { select: { id: true, name: true } } } },
-      assignedTo: { select: { id: true, name: true } },
-      sentBy:     { select: { id: true, name: true } },
-      responseTag: true,
-    },
-    orderBy: [{ status: "asc" }, { addedAt: "asc" }],
-  });
-  return NextResponse.json(items);
+  const [items, total] = await Promise.all([
+    prisma.campaignContact.findMany({
+      where,
+      include: {
+        contact:    { select: { id: true, name: true, phone: true, role: true, parent: { select: { id: true, name: true } } } },
+        assignedTo: { select: { id: true, name: true } },
+        sentBy:     { select: { id: true, name: true } },
+        responseTag: true,
+      },
+      orderBy: [{ status: "asc" }, { addedAt: "asc" }],
+      take: limit,
+      skip: offset,
+    }),
+    prisma.campaignContact.count({ where }),
+  ]);
+
+  return NextResponse.json({ items, total });
 }
 
 /**
- * Adiciona contatos à campanha. Aceita:
- *  - { contactIds: string[] }
- *  - { groupId: string }
- *  - { reuniaoId: string, mode?: "all" | "anfitrioes" | "presentes" }
- *  - { roleKey: string }   // todos contatos de um papel
- *  - { assignedToId?: string } opcional, aplicado a todos os adicionados
+ * Resolve filtros em uma lista de contactIds.
+ * Filtros aceitos:
+ *  - contactIds: string[]
+ *  - reuniaoId + mode ("all" | "anfitrioes" | "presentes")
+ *  - roleKeys: string[]
+ *  - zonas: string[]
+ *  - cidades: string[]
+ *  - sources: string[]                   // ex: ["reuniao", "message", "manual"]
+ *  - excludeInAnyCampaign: boolean       // exclui quem já está em qualquer outra campanha
  */
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const body = await req.json();
-  const { contactIds, groupId, reuniaoId, mode = "all", roleKey, assignedToId } = body;
+async function resolveContactIds(filters: any, campaignId: string): Promise<string[]> {
+  const ids = new Set<string>();
+  const { contactIds, reuniaoId, mode, roleKeys, zonas, cidades, sources, excludeInAnyCampaign } = filters;
 
-  let ids: string[] = Array.isArray(contactIds) ? [...contactIds] : [];
+  if (Array.isArray(contactIds)) contactIds.forEach((id: string) => ids.add(id));
 
-  if (groupId) {
-    const members = await prisma.groupMember.findMany({ where: { groupId }, select: { contactId: true } });
-    ids.push(...members.map(m => m.contactId));
-  }
   if (reuniaoId) {
     const r = await prisma.reuniao.findUnique({
       where: { id: reuniaoId },
@@ -50,24 +66,54 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         presentes:  { select: { contactId: true } },
       },
     });
-    if (!r) return NextResponse.json({ error: "Reunião não encontrada" }, { status: 404 });
-    const anfSet = new Set(r.anfitrioes.map(a => a.contactId));
-    if (mode === "anfitrioes")     ids.push(...r.anfitrioes.map(a => a.contactId));
-    else if (mode === "presentes") ids.push(...r.presentes.filter(p => p.contactId && !anfSet.has(p.contactId)).map(p => p.contactId!));
-    else                            ids.push(...r.presentes.filter(p => p.contactId).map(p => p.contactId!));
-  }
-  if (roleKey) {
-    const role = await prisma.personRole.findUnique({ where: { key: roleKey } });
-    if (role) {
-      const cs = await prisma.contact.findMany({ where: { roleId: role.id }, select: { id: true } });
-      ids.push(...cs.map(c => c.id));
+    if (r) {
+      const anfSet = new Set(r.anfitrioes.map(a => a.contactId));
+      if (mode === "anfitrioes")     r.anfitrioes.forEach(a => ids.add(a.contactId));
+      else if (mode === "presentes") r.presentes.filter(p => p.contactId && !anfSet.has(p.contactId)).forEach(p => ids.add(p.contactId!));
+      else                            r.presentes.filter(p => p.contactId).forEach(p => ids.add(p.contactId!));
     }
   }
 
-  ids = Array.from(new Set(ids));
+  // Filtro por critérios (combinados via AND)
+  const hasCriteria = (Array.isArray(roleKeys) && roleKeys.length) ||
+                      (Array.isArray(zonas)    && zonas.length) ||
+                      (Array.isArray(cidades)  && cidades.length) ||
+                      (Array.isArray(sources)  && sources.length);
+  if (hasCriteria) {
+    const where: any = {};
+    if (roleKeys?.length) where.role    = { key: { in: roleKeys } };
+    if (zonas?.length)    where.zona    = { in: zonas };
+    if (cidades?.length)  where.cidade  = { in: cidades };
+    if (sources?.length)  where.source  = { in: sources };
+    const cs = await prisma.contact.findMany({ where, select: { id: true } });
+    cs.forEach(c => ids.add(c.id));
+  }
+
+  let arr = Array.from(ids);
+
+  // Excluir quem já está em alguma outra campanha
+  if (excludeInAnyCampaign && arr.length > 0) {
+    const inOther = await prisma.campaignContact.findMany({
+      where: { contactId: { in: arr }, campaignId: { not: campaignId } },
+      select: { contactId: true },
+    });
+    const otherSet = new Set(inOther.map(c => c.contactId));
+    arr = arr.filter(id => !otherSet.has(id));
+  }
+
+  return arr;
+}
+
+/**
+ * Adiciona contatos à campanha. Aceita os filtros descritos em resolveContactIds
+ * + assignedToId opcional aplicado a todos os adicionados.
+ */
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const body = await req.json();
+  const ids = await resolveContactIds(body, params.id);
+
   if (ids.length === 0) return NextResponse.json({ added: 0, skipped: 0 });
 
-  // Filtra os que já estão
   const existing = await prisma.campaignContact.findMany({
     where: { campaignId: params.id, contactId: { in: ids } },
     select: { contactId: true },
@@ -78,9 +124,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (toAdd.length > 0) {
     await prisma.campaignContact.createMany({
       data: toAdd.map(contactId => ({
-        campaignId: params.id,
+        campaignId:   params.id,
         contactId,
-        assignedToId: assignedToId || null,
+        assignedToId: body.assignedToId || null,
       })),
     });
   }
