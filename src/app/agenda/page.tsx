@@ -464,7 +464,7 @@ function EventPill({ evento, calendarios, onClick }: { evento: any; calendarios:
 function MonthView({ currentDate, events, calendarios, onDayClick, onEventClick, onMoveEvent }: {
   currentDate: Date; events: any[]; calendarios: any[];
   onDayClick: (d: Date) => void; onEventClick: (e: any) => void;
-  onMoveEvent: (id: string, day: Date) => void;
+  onMoveEvent: (id: string, newInicio: Date, withTime: boolean) => void;
 }) {
   const cells = getMonthGrid(currentDate.getFullYear(), currentDate.getMonth());
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
@@ -489,7 +489,14 @@ function MonthView({ currentDate, events, calendarios, onDayClick, onEventClick,
                 e.preventDefault();
                 const id = e.dataTransfer.getData("text/event-id");
                 setDragOverIdx(null);
-                if (id) onMoveEvent(id, cell);
+                if (!id) return;
+                const ev = events.find(x => x.id === id);
+                const next = new Date(cell);
+                if (ev) {
+                  const old = new Date(ev.inicio);
+                  next.setHours(old.getHours(), old.getMinutes(), 0, 0);
+                }
+                onMoveEvent(id, next, false);
               }}
               className={`border-b border-r border-gray-100 p-1 cursor-pointer transition-colors ${!inMonth ? "bg-gray-50/70" : ""} ${dragging ? "bg-brand-100 ring-2 ring-inset ring-brand-400" : "hover:bg-gray-50"}`}>
               <div className={`text-[11px] font-semibold mb-0.5 w-5 h-5 flex items-center justify-center rounded-full ${today ? "bg-brand-600 text-white" : inMonth ? "text-gray-700" : "text-gray-300"}`}>
@@ -523,7 +530,7 @@ const dayWidth = `calc((100% - ${TIME_COL_W}px) / 7)`;
 function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick, onMoveEvent }: {
   currentDate: Date; events: any[]; calendarios: any[];
   onEventClick: (e: any) => void; onSlotClick: (d: Date) => void;
-  onMoveEvent: (id: string, day: Date) => void;
+  onMoveEvent: (id: string, newInicio: Date, withTime: boolean) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dayHeaderRef = useRef<HTMLDivElement>(null);
@@ -599,7 +606,16 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick,
                   e.preventDefault();
                   const id = e.dataTransfer.getData("text/event-id");
                   setDragOverDay(null);
-                  if (id) onMoveEvent(id, day);
+                  if (!id) return;
+                  // Calcula hora pela posição Y do drop dentro da coluna,
+                  // com snap de 30 min e clamping ao intervalo da grade
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const y = e.clientY - rect.top;
+                  const maxMin = (END_HOUR - START_HOUR) * 60 - 30;
+                  const minutesFromStart = Math.max(0, Math.min(maxMin, Math.round((y / HOUR_PX) * 2) * 30));
+                  const next = new Date(day);
+                  next.setHours(START_HOUR + Math.floor(minutesFromStart / 60), minutesFromStart % 60, 0, 0);
+                  onMoveEvent(id, next, true);
                 }}>
 
               {/* Slots de 30 min — borda cheia em hora cheia, leve em meia */}
@@ -758,9 +774,14 @@ function getDateRange(view: ViewType, ref: Date) {
     end.setHours(23, 59, 59);
     return { start: days[0], end };
   }
-  const end = new Date(ref);
-  end.setDate(ref.getDate() + 60);
-  return { start: ref, end };
+  // Lista: começa do início do dia atual (00:00) para incluir eventos
+  // que aconteceram mais cedo no mesmo dia
+  const start = new Date(ref);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 60);
+  end.setHours(23, 59, 59);
+  return { start, end };
 }
 
 function navigate(view: ViewType, ref: Date, dir: -1 | 1): Date {
@@ -823,22 +844,20 @@ export default function AgendaPage() {
   function openEdit(ev: any)    { setSelected(ev); setDefaultDate(undefined); setModal("editar"); }
   function closeModal()          { setModal(null); setSelected(null); }
 
-  const moveEvent = useCallback(async (eventId: string, newDay: Date) => {
+  const moveEvent = useCallback(async (eventId: string, newInicio: Date, withTime: boolean) => {
     const ev = allEvents.find(e => e.id === eventId);
     if (!ev) return;
     const old = new Date(ev.inicio);
-    const next = new Date(newDay);
-    next.setHours(old.getHours(), old.getMinutes(), 0, 0);
-    if (next.getTime() === old.getTime()) return;
+    if (newInicio.getTime() === old.getTime()) return;
 
-    setAllEvents(prev => prev.map(e => e.id === eventId ? { ...e, inicio: next.toISOString() } : e));
+    setAllEvents(prev => prev.map(e => e.id === eventId ? { ...e, inicio: newInicio.toISOString() } : e));
     try {
       const r = await fetch(`/api/agenda/${eventId}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inicio: next.toISOString() }),
+        body: JSON.stringify({ inicio: newInicio.toISOString() }),
       });
       if (!r.ok) throw new Error();
-      toast.success(`Movido para ${format(next, "dd/MM", { locale: ptBR })}`);
+      toast.success(`Movido para ${format(newInicio, withTime ? "dd/MM 'às' HH:mm" : "dd/MM", { locale: ptBR })}`);
     } catch {
       toast.error("Erro ao mover");
       load(true);
