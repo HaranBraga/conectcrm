@@ -11,8 +11,20 @@ const DEFAULT_TAGS = [
   { label: "Negou",         color: "#dc2626", bgColor: "#fee2e2", order: 3 },
 ];
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const reuniaoId = searchParams.get("reuniaoOriginId");
+  const includeReuniao = searchParams.get("includeReuniaoDispatches") === "true";
+
+  // Por padrão, esconde campanhas vindas de reunião (essas têm UI própria
+  // em /campanhas/reunioes/[id]). Use ?reuniaoOriginId=X para listar
+  // apenas as de uma reunião, ou ?includeReuniaoDispatches=true para tudo.
+  const where: any = {};
+  if (reuniaoId) where.reuniaoOriginId = reuniaoId;
+  else if (!includeReuniao) where.reuniaoOriginId = null;
+
   const campaigns = await prisma.campaign.findMany({
+    where,
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { contacts: true } },
