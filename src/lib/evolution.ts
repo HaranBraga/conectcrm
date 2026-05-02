@@ -38,6 +38,10 @@ export async function sendMediaBase64(
   caption?: string
 ) {
   const number = phone.replace(/\D/g, "");
+  // Áudio usa endpoint próprio (/sendWhatsAppAudio) — vira nota de voz
+  if (mediaType === "audio") {
+    return sendAudioBase64(phone, base64);
+  }
   const { data } = await client.post(`/message/sendMedia/${INSTANCE}`, {
     number,
     mediatype: mediaType,
@@ -45,6 +49,22 @@ export async function sendMediaBase64(
     media: base64,
     fileName,
     caption: caption || undefined,
+  });
+  return data;
+}
+
+/**
+ * Envia áudio como nota de voz via endpoint específico do Evolution.
+ * Aceita base64 (sem prefixo data:) ou URL.
+ * `encoding: true` reencoda no servidor pro formato que o WhatsApp aceita
+ * (ogg/opus mono), evitando rejeição quando o arquivo vem em outro codec.
+ */
+export async function sendAudioBase64(phone: string, base64OrUrl: string) {
+  const number = phone.replace(/\D/g, "");
+  const { data } = await client.post(`/message/sendWhatsAppAudio/${INSTANCE}`, {
+    number,
+    audio: base64OrUrl,
+    encoding: true,
   });
   return data;
 }
