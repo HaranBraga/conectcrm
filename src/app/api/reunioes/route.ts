@@ -60,13 +60,11 @@ export async function POST(req: NextRequest) {
       anfitrioes: { create: uniqAnfIds.map(id => ({ contactId: id })) },
       presentes:  { create: uniqPresIds.map(id => ({ contactId: id })) },
       avaliacoes: {
-        create: avaliacoes
-          .filter((a: any) => a.avaliadorId || a.avaliadorNome)
-          .map((a: any) => ({
-            slot: a.slot, atencao: a.atencao ?? 0, interacao: a.interacao ?? 0,
-            avaliadorId:   a.avaliadorId   || null,
-            avaliadorNome: a.avaliadorNome || null,
-          })),
+        create: avaliacoes.map((a: any) => ({
+          slot: a.slot,
+          atencao: a.atencao ?? 0,
+          interacao: a.interacao ?? 0,
+        })),
       },
     },
     include,
