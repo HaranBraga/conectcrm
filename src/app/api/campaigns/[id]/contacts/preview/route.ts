@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const filters = await req.json();
   const ids = new Set<string>();
-  const { contactIds, reuniaoId, mode, roleKeys, zonas, cidades, sources, excludeInAnyCampaign } = filters;
+  const { contactIds, reuniaoId, mode, roleKeys, cidades, bairros, excludeInAnyCampaign } = filters;
 
   if (Array.isArray(contactIds)) contactIds.forEach((id: string) => ids.add(id));
 
@@ -28,15 +28,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const hasCriteria = (Array.isArray(roleKeys) && roleKeys.length) ||
-                      (Array.isArray(zonas)    && zonas.length) ||
                       (Array.isArray(cidades)  && cidades.length) ||
-                      (Array.isArray(sources)  && sources.length);
+                      (Array.isArray(bairros)  && bairros.length);
   if (hasCriteria) {
     const where: any = {};
     if (roleKeys?.length) where.role   = { key: { in: roleKeys } };
-    if (zonas?.length)    where.zona   = { in: zonas };
     if (cidades?.length)  where.cidade = { in: cidades };
-    if (sources?.length)  where.source = { in: sources };
+    if (bairros?.length)  where.bairro = { in: bairros };
     const cs = await prisma.contact.findMany({ where, select: { id: true } });
     cs.forEach(c => ids.add(c.id));
   }

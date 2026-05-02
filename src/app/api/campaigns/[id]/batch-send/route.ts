@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendText, sendMedia } from "@/lib/evolution";
-import { resolveTemplate, buildVarContext } from "@/lib/campaigns";
+import { resolveTemplate, buildVarContext, getMissingVariables } from "@/lib/campaigns";
 import { broadcast } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +48,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     for (const cc of pendentes) {
       try {
         const ctx = await buildVarContext(cc.id);
+
+        // Valida que todas as variáveis usadas no template têm valor
+        const missing = getMissingVariables(campaign.messageTemplate, ctx);
+        if (missing.length > 0) {
+          await prisma.campaignContact.update({
+            where: { id: cc.id },
+            data: {
+              status: "IGNOROU",
+              notes: `[Variável faltando]: ${missing.map(v => `{{${v}}}`).join(", ")}`,
+              respondedAt: new Date(),
+            },
+          });
+          broadcast("campaigns", { action: "send-skipped", id: params.id, ccId: cc.id, missing });
+          continue;
+        }
+
         const finalMessage = resolveTemplate(campaign.messageTemplate, ctx);
         if (campaign.mediaUrl && campaign.mediaType) {
           const caption = campaign.linkUrl ? `${finalMessage}\n\n${campaign.linkUrl}` : finalMessage;

@@ -14,16 +14,31 @@ export type CampaignVarContext = {
   liderName?: string | null;
 };
 
-export function resolveTemplate(template: string, ctx: CampaignVarContext): string {
+function buildVarMap(ctx: CampaignVarContext): Record<string, string> {
   const first = (s?: string | null) => (s ? s.trim().split(/\s+/)[0] : "");
-  const map: Record<string, string> = {
+  return {
     nome:          ctx.contactName ?? "",
     primeiroNome:  first(ctx.contactName),
     telefone:      ctx.contactPhone ?? "",
     lider:         ctx.liderName ?? "",
     primeiroLider: first(ctx.liderName),
   };
+}
+
+export function resolveTemplate(template: string, ctx: CampaignVarContext): string {
+  const map = buildVarMap(ctx);
   return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => map[k] ?? "");
+}
+
+/**
+ * Retorna lista de variáveis usadas no template que estão vazias no contexto.
+ * Útil para abortar envio quando há campos personalizados faltando.
+ */
+export function getMissingVariables(template: string, ctx: CampaignVarContext): string[] {
+  const map = buildVarMap(ctx);
+  const used = new Set<string>();
+  template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => { used.add(k); return ""; });
+  return Array.from(used).filter(k => !map[k] || !map[k].trim());
 }
 
 /**

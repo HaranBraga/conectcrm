@@ -47,14 +47,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
  *  - contactIds: string[]
  *  - reuniaoId + mode ("all" | "anfitrioes" | "presentes")
  *  - roleKeys: string[]
- *  - zonas: string[]
  *  - cidades: string[]
- *  - sources: string[]                   // ex: ["reuniao", "message", "manual"]
- *  - excludeInAnyCampaign: boolean       // exclui quem já está em qualquer outra campanha
+ *  - bairros: string[]
+ *  - excludeInAnyCampaign: boolean
  */
 async function resolveContactIds(filters: any, campaignId: string): Promise<string[]> {
   const ids = new Set<string>();
-  const { contactIds, reuniaoId, mode, roleKeys, zonas, cidades, sources, excludeInAnyCampaign } = filters;
+  const { contactIds, reuniaoId, mode, roleKeys, cidades, bairros, excludeInAnyCampaign } = filters;
 
   if (Array.isArray(contactIds)) contactIds.forEach((id: string) => ids.add(id));
 
@@ -76,15 +75,13 @@ async function resolveContactIds(filters: any, campaignId: string): Promise<stri
 
   // Filtro por critérios (combinados via AND)
   const hasCriteria = (Array.isArray(roleKeys) && roleKeys.length) ||
-                      (Array.isArray(zonas)    && zonas.length) ||
                       (Array.isArray(cidades)  && cidades.length) ||
-                      (Array.isArray(sources)  && sources.length);
+                      (Array.isArray(bairros)  && bairros.length);
   if (hasCriteria) {
     const where: any = {};
-    if (roleKeys?.length) where.role    = { key: { in: roleKeys } };
-    if (zonas?.length)    where.zona    = { in: zonas };
-    if (cidades?.length)  where.cidade  = { in: cidades };
-    if (sources?.length)  where.source  = { in: sources };
+    if (roleKeys?.length) where.role   = { key: { in: roleKeys } };
+    if (cidades?.length)  where.cidade = { in: cidades };
+    if (bairros?.length)  where.bairro = { in: bairros };
     const cs = await prisma.contact.findMany({ where, select: { id: true } });
     cs.forEach(c => ids.add(c.id));
   }

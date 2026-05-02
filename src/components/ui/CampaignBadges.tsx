@@ -75,7 +75,7 @@ function CampaignBadge({ cc, onChanged }: { cc: any; onChanged: () => void }) {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-xl shadow-lg p-1.5 w-56 max-h-64 overflow-y-auto">
+        <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl p-1.5 w-56 max-h-64 overflow-y-auto" style={{ zIndex: 100 }}>
           <p className="text-[10px] uppercase font-semibold text-gray-400 px-2 py-1">Etiqueta da resposta</p>
           {tags.length === 0 ? (
             <p className="text-xs text-gray-400 px-2 py-2">Carregando...</p>
@@ -118,7 +118,7 @@ export function CampaignBadges({ contactId }: { contactId: string }) {
   if (loading || items.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-2 px-5 py-2 bg-indigo-50/50 border-b border-indigo-100 overflow-x-auto">
+    <div className="flex flex-wrap items-center gap-2 px-5 py-2 bg-indigo-50/50 border-b border-indigo-100 relative" style={{ zIndex: 20 }}>
       <Megaphone size={12} className="text-indigo-500 shrink-0" />
       <span className="text-[11px] text-indigo-600 font-medium shrink-0">Campanhas:</span>
       {items.map(cc => <CampaignBadge key={cc.id} cc={cc} onChanged={load} />)}
