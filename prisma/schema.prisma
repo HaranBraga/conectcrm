@@ -175,6 +175,21 @@ model AppConfig {
   value String
 }
 
+model User {
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  password  String                                  // bcrypt hash
+  isAdmin   Boolean   @default(false)
+  modules   String[]  @default([])                  // ex: ["conversas","contatos","campanhas"]
+  active    Boolean   @default(true)
+  lastLogin DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([email])
+}
+
 model Demanda {
   id            String   @id @default(cuid())
   titulo        String

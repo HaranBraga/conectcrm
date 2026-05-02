@@ -1,4 +1,5 @@
 const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcryptjs");
 const prisma = new PrismaClient();
 
 const DEFAULT_ROLES = [
@@ -103,12 +104,36 @@ async function seedCalendarios() {
   }
 }
 
+async function seedAdmin() {
+  const count = await prisma.user.count();
+  if (count > 0) {
+    console.log(`✅ Usuários: ${count} já cadastrados`);
+    return;
+  }
+  const email = (process.env.ADMIN_EMAIL || "admin@admin.com").toLowerCase();
+  const password = process.env.ADMIN_PASSWORD || "admin123";
+  const hashed = await bcrypt.hash(password, 10);
+  await prisma.user.create({
+    data: {
+      name: "Administrador",
+      email,
+      password: hashed,
+      isAdmin: true,
+      modules: [],
+      active: true,
+    },
+  });
+  console.log(`✅ Admin inicial criado — email: ${email}, senha: ${password}`);
+  console.log("   ⚠ Mude a senha imediatamente em Configurações > Usuários");
+}
+
 async function main() {
   await seedRoles();
   await seedKanban();
   await seedLabels();
   await seedDemandaConfig();
   await seedCalendarios();
+  await seedAdmin();
 }
 
 main()
