@@ -297,7 +297,8 @@ function ConfigTab({ campaign, onSaved }: any) {
       body: JSON.stringify({ label: newTag }),
     });
     if (!r.ok) { toast.error("Erro"); return; }
-    setTags((prev: any[]) => [...prev, await r.json()]);
+    const tag = await r.json();
+    setTags((prev: any[]) => [...prev, tag]);
     setNewTag("");
   }
 
