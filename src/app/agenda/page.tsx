@@ -443,8 +443,15 @@ function EventPill({ evento, calendarios, onClick }: { evento: any; calendarios:
   const col = cal ? cal.cor : t.color;
   const cancelled = evento.status === "CANCELADA";
   return (
-    <div onClick={e => { e.stopPropagation(); onClick(); }}
-      className={`rounded px-1 py-0.5 text-[11px] font-medium cursor-pointer truncate leading-tight ${cancelled ? "opacity-40 line-through" : ""}`}
+    <div
+      draggable
+      onDragStart={e => {
+        e.dataTransfer.setData("text/event-id", evento.id);
+        e.dataTransfer.effectAllowed = "move";
+        e.stopPropagation();
+      }}
+      onClick={e => { e.stopPropagation(); onClick(); }}
+      className={`rounded px-1 py-0.5 text-[11px] font-medium cursor-pointer truncate leading-tight active:cursor-grabbing ${cancelled ? "opacity-40 line-through" : ""}`}
       style={{ backgroundColor: bg, color: col, borderLeft: `2px solid ${col}` }}>
       <span className="opacity-80 mr-0.5">{format(new Date(evento.inicio), "HH:mm")}</span>
       {evento.titulo}
@@ -454,11 +461,13 @@ function EventPill({ evento, calendarios, onClick }: { evento: any; calendarios:
 
 // ─── Month View ───────────────────────────────────────────────────────────────
 
-function MonthView({ currentDate, events, calendarios, onDayClick, onEventClick }: {
+function MonthView({ currentDate, events, calendarios, onDayClick, onEventClick, onMoveEvent }: {
   currentDate: Date; events: any[]; calendarios: any[];
   onDayClick: (d: Date) => void; onEventClick: (e: any) => void;
+  onMoveEvent: (id: string, day: Date) => void;
 }) {
   const cells = getMonthGrid(currentDate.getFullYear(), currentDate.getMonth());
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   return (
     <div className="flex flex-col flex-1 overflow-hidden px-4 pt-2 min-h-0">
       <div className="grid grid-cols-7 border-b border-gray-100 shrink-0">
@@ -471,9 +480,18 @@ function MonthView({ currentDate, events, calendarios, onDayClick, onEventClick 
           const dayEvents = events.filter(e => isSameDay(new Date(e.inicio), cell));
           const inMonth   = isSameMonth(cell, currentDate);
           const today     = isToday(cell);
+          const dragging  = dragOverIdx === i;
           return (
             <div key={i} onClick={() => onDayClick(cell)}
-              className={`border-b border-r border-gray-100 p-1 cursor-pointer hover:bg-gray-50 transition-colors ${!inMonth ? "bg-gray-50/70" : ""}`}>
+              onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dragOverIdx !== i) setDragOverIdx(i); }}
+              onDragLeave={() => { if (dragOverIdx === i) setDragOverIdx(null); }}
+              onDrop={e => {
+                e.preventDefault();
+                const id = e.dataTransfer.getData("text/event-id");
+                setDragOverIdx(null);
+                if (id) onMoveEvent(id, cell);
+              }}
+              className={`border-b border-r border-gray-100 p-1 cursor-pointer transition-colors ${!inMonth ? "bg-gray-50/70" : ""} ${dragging ? "bg-brand-100 ring-2 ring-inset ring-brand-400" : "hover:bg-gray-50"}`}>
               <div className={`text-[11px] font-semibold mb-0.5 w-5 h-5 flex items-center justify-center rounded-full ${today ? "bg-brand-600 text-white" : inMonth ? "text-gray-700" : "text-gray-300"}`}>
                 {cell.getDate()}
               </div>
@@ -502,13 +520,15 @@ const N_SLOTS    = (END_HOUR - START_HOUR) * 2;
 const dayLeft  = (i: number) => `calc(${TIME_COL_W}px + (100% - ${TIME_COL_W}px) * ${i} / 7)`;
 const dayWidth = `calc((100% - ${TIME_COL_W}px) / 7)`;
 
-function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick }: {
+function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick, onMoveEvent }: {
   currentDate: Date; events: any[]; calendarios: any[];
   onEventClick: (e: any) => void; onSlotClick: (d: Date) => void;
+  onMoveEvent: (id: string, day: Date) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dayHeaderRef = useRef<HTMLDivElement>(null);
   const [scrollH, setScrollH] = useState(500);
+  const [dragOverDay, setDragOverDay] = useState<number | null>(null);
 
   useEffect(() => {
     const measure = () => {
@@ -567,10 +587,20 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
           </div>
 
           {/* Colunas de dias — mesma fórmula calc() do cabeçalho */}
-          {days.map((day, di) => (
-            <div key={di}
-              className="absolute top-0 border-l border-gray-100 overflow-hidden"
-              style={{ left: dayLeft(di), width: dayWidth, height: TOTAL_H }}>
+          {days.map((day, di) => {
+            const isDragOver = dragOverDay === di;
+            return (
+              <div key={di}
+                className={`absolute top-0 border-l border-gray-100 overflow-hidden ${isDragOver ? "bg-brand-50/40 ring-2 ring-inset ring-brand-400" : ""}`}
+                style={{ left: dayLeft(di), width: dayWidth, height: TOTAL_H }}
+                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dragOverDay !== di) setDragOverDay(di); }}
+                onDragLeave={() => { if (dragOverDay === di) setDragOverDay(null); }}
+                onDrop={e => {
+                  e.preventDefault();
+                  const id = e.dataTransfer.getData("text/event-id");
+                  setDragOverDay(null);
+                  if (id) onMoveEvent(id, day);
+                }}>
 
               {/* Slots de 30 min — borda cheia em hora cheia, leve em meia */}
               {Array.from({ length: N_SLOTS }, (_, idx) => {
@@ -599,8 +629,15 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
                 const col = cal?.cor ?? t.color;
                 const bg  = cal ? `${col}22` : t.bg;
                 return (
-                  <div key={ev.id} onClick={() => onEventClick(ev)}
-                    className="absolute rounded-md px-1.5 py-0.5 text-[11px] cursor-pointer overflow-hidden shadow-sm"
+                  <div key={ev.id}
+                    draggable
+                    onDragStart={e => {
+                      e.dataTransfer.setData("text/event-id", ev.id);
+                      e.dataTransfer.effectAllowed = "move";
+                      e.stopPropagation();
+                    }}
+                    onClick={() => onEventClick(ev)}
+                    className="absolute rounded-md px-1.5 py-0.5 text-[11px] cursor-pointer overflow-hidden shadow-sm active:cursor-grabbing"
                     style={{
                       top:    (minFrom / 60) * HOUR_PX,
                       height: Math.max(22, (dur / 60) * HOUR_PX - 2),
@@ -614,7 +651,8 @@ function WeekView({ currentDate, events, calendarios, onEventClick, onSlotClick 
                 );
               })}
             </div>
-          ))}
+            );
+          })}
 
         </div>
       </div>
@@ -785,6 +823,28 @@ export default function AgendaPage() {
   function openEdit(ev: any)    { setSelected(ev); setDefaultDate(undefined); setModal("editar"); }
   function closeModal()          { setModal(null); setSelected(null); }
 
+  const moveEvent = useCallback(async (eventId: string, newDay: Date) => {
+    const ev = allEvents.find(e => e.id === eventId);
+    if (!ev) return;
+    const old = new Date(ev.inicio);
+    const next = new Date(newDay);
+    next.setHours(old.getHours(), old.getMinutes(), 0, 0);
+    if (next.getTime() === old.getTime()) return;
+
+    setAllEvents(prev => prev.map(e => e.id === eventId ? { ...e, inicio: next.toISOString() } : e));
+    try {
+      const r = await fetch(`/api/agenda/${eventId}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inicio: next.toISOString() }),
+      });
+      if (!r.ok) throw new Error();
+      toast.success(`Movido para ${format(next, "dd/MM", { locale: ptBR })}`);
+    } catch {
+      toast.error("Erro ao mover");
+      load(true);
+    }
+  }, [allEvents, load]);
+
   function toggleCal(id: string) {
     setSelectedCals(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
@@ -859,9 +919,9 @@ export default function AgendaPage() {
             <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : view === "mes" ? (
-          <MonthView currentDate={refDate} events={events} calendarios={calendarios} onDayClick={openNew} onEventClick={openEdit} />
+          <MonthView currentDate={refDate} events={events} calendarios={calendarios} onDayClick={openNew} onEventClick={openEdit} onMoveEvent={moveEvent} />
         ) : view === "semana" ? (
-          <WeekView currentDate={refDate} events={events} calendarios={calendarios} onEventClick={openEdit} onSlotClick={d => openNew(d)} />
+          <WeekView currentDate={refDate} events={events} calendarios={calendarios} onEventClick={openEdit} onSlotClick={d => openNew(d)} onMoveEvent={moveEvent} />
         ) : (
           <AgendaListView events={events} calendarios={calendarios} onEventClick={openEdit} />
         )}

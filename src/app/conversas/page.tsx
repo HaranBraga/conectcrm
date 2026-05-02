@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search, Send, X, UserPlus, RefreshCw,
-  CheckCheck, Paperclip, Link2, FileText, Mic,
+  CheckCheck, Paperclip, Link2, FileText, Mic, Image as ImageIcon, Film,
   MessageSquarePlus, Archive, ArchiveRestore,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -196,7 +196,7 @@ function MediaBubble({ messageId, mediaType }: { messageId: string; mediaType: s
   if (mediaType === "image") {
     if (state !== "ready") return (
       <button onClick={load} disabled={state === "loading"} className="flex items-center gap-2 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-xl transition-colors w-full justify-center">
-        {state === "loading" ? <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" /> : <span className="text-base">🖼</span>}
+        {state === "loading" ? <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" /> : <ImageIcon size={14} className="text-gray-400" />}
         <span>{state === "loading" ? "Carregando…" : "Ver imagem"}</span>
       </button>
     );
@@ -205,7 +205,7 @@ function MediaBubble({ messageId, mediaType }: { messageId: string; mediaType: s
   if (mediaType === "video") {
     if (state !== "ready") return (
       <button onClick={load} disabled={state === "loading"} className="flex items-center gap-2 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-xl transition-colors w-full justify-center">
-        {state === "loading" ? <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" /> : <span className="text-base">🎬</span>}
+        {state === "loading" ? <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" /> : <Film size={14} className="text-gray-400" />}
         <span>{state === "loading" ? "Carregando…" : "Ver vídeo"}</span>
       </button>
     );

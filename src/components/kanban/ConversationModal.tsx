@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { LabelManager, type LabelDef } from "@/components/ui/LabelManager";
-import { Send, Clock, Archive, Paperclip, CheckCheck, FileText, Mic } from "lucide-react";
+import { Send, Clock, Archive, Paperclip, CheckCheck, FileText, Mic, Image as ImageIcon, Film, Music } from "lucide-react";
 import { DemandaInline } from "@/components/ui/DemandaInline";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -41,28 +41,30 @@ function MediaBubble({ messageId, mediaType }: { messageId: string; mediaType: s
   }
 
   if (state === "error") return <p className="text-xs text-red-400">Mídia indisponível</p>;
-  const loadBtn = (icon: string, label: string) => (
+  const loadBtn = (Icon: any, label: string) => (
     <button onClick={load} disabled={state === "loading"}
       className="flex items-center gap-2 text-xs text-gray-500 bg-black/5 hover:bg-black/10 px-3 py-1.5 rounded-lg w-full justify-center">
-      {state === "loading" ? <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" /> : <span>{icon}</span>}
+      {state === "loading"
+        ? <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+        : <Icon size={14} className="text-gray-400" />}
       {state === "loading" ? "Carregando…" : label}
     </button>
   );
 
   if (mediaType === "image") {
-    if (state !== "ready") return loadBtn("🖼", "Ver imagem");
+    if (state !== "ready") return loadBtn(ImageIcon, "Ver imagem");
     return <img src={src!} className="rounded-xl max-w-full max-h-40 object-contain cursor-pointer" onClick={() => window.open(src!, "_blank")} alt="" />;
   }
   if (mediaType === "video") {
-    if (state !== "ready") return loadBtn("🎬", "Ver vídeo");
+    if (state !== "ready") return loadBtn(Film, "Ver vídeo");
     return <video src={src!} controls className="rounded-xl max-w-full max-h-40" />;
   }
   if (mediaType === "audio") {
-    if (state !== "ready") return loadBtn("🎵", "Ouvir áudio");
+    if (state !== "ready") return loadBtn(Music, "Ouvir áudio");
     return <audio src={src!} controls className="w-full max-w-xs" />;
   }
   if (mediaType === "document") {
-    if (state !== "ready") return loadBtn("📄", "Baixar arquivo");
+    if (state !== "ready") return loadBtn(FileText, "Baixar arquivo");
     return <a href={src!} download className="flex items-center gap-1.5 text-xs text-indigo-600 hover:underline"><FileText size={13} /> Baixar arquivo</a>;
   }
   return null;
