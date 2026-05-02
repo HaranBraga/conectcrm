@@ -83,10 +83,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         });
         broadcast("campaigns", { action: "sent", id: params.id, ccId: cc.id });
       } catch (e: any) {
-        // Marca como IGNOROU pra não tentar de novo automaticamente; log do erro em notes
+        // Marca como FALHOU (processado com erro) — conta no resumo e
+        // pode ser filtrado/reprocessado depois
         await prisma.campaignContact.update({
           where: { id: cc.id },
-          data: { notes: `[Falha no envio]: ${e?.message ?? "erro"}` },
+          data: {
+            status: "FALHOU",
+            respondedAt: new Date(),
+            notes: `[Falha no envio]: ${e?.message ?? "erro desconhecido"}`,
+          },
         });
         broadcast("campaigns", { action: "send-failed", id: params.id, ccId: cc.id, error: e?.message });
       }

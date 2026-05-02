@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Send, Plus, Users, CheckCheck, Clock, Trash2, Search } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { CampanhasTabs } from "@/components/ui/CampanhasTabs";
 import toast from "react-hot-toast";
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
@@ -103,14 +104,17 @@ export default function CampanhasPage() {
 
   return (
     <div className="flex flex-col h-screen">
-      <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 shrink-0">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Campanhas</h1>
-          <p className="text-sm text-gray-500">Gerencie campanhas de relacionamento e converta com a equipe</p>
+      <header className="bg-white border-b border-gray-200 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Campanhas</h1>
+            <p className="text-sm text-gray-500">Gerencie campanhas de relacionamento e converta com a equipe</p>
+          </div>
+          <button onClick={() => setModal(true)} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            <Plus size={16} /> Nova Campanha
+          </button>
         </div>
-        <button onClick={() => setModal(true)} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          <Plus size={16} /> Nova Campanha
-        </button>
+        <CampanhasTabs />
       </header>
 
       <div className="px-6 py-3 bg-white border-b border-gray-100 shrink-0">

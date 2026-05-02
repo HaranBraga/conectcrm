@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getDescendantContactIds } from "@/lib/contacts";
 
 export const dynamic = "force-dynamic";
 
-/**
- * POST: retorna preview de quantos contatos serão adicionados
- * (resolve filtros mas não persiste).
- */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const filters = await req.json();
   const ids = new Set<string>();
-  const { contactIds, reuniaoId, mode, roleKeys, cidades, bairros, excludeInAnyCampaign } = filters;
+  const {
+    contactIds, reuniaoId, mode,
+    roleKeys, cidades, bairros, labels,
+    liderIds, liderDepth = "direct",
+    excludeInAnyCampaign,
+  } = filters;
 
   if (Array.isArray(contactIds)) contactIds.forEach((id: string) => ids.add(id));
 
@@ -28,13 +30,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const hasCriteria = (Array.isArray(roleKeys) && roleKeys.length) ||
-                      (Array.isArray(cidades)  && cidades.length) ||
-                      (Array.isArray(bairros)  && bairros.length);
+                      (Array.isArray(cidades)  && cidades.length)  ||
+                      (Array.isArray(bairros)  && bairros.length)  ||
+                      (Array.isArray(labels)   && labels.length)   ||
+                      (Array.isArray(liderIds) && liderIds.length);
+
   if (hasCriteria) {
+    let candidateIds: Set<string> | null = null;
+    if (Array.isArray(liderIds) && liderIds.length > 0) {
+      const desc = await getDescendantContactIds(liderIds, liderDepth === "all" ? "all" : "direct");
+      candidateIds = new Set(desc);
+    }
     const where: any = {};
     if (roleKeys?.length) where.role   = { key: { in: roleKeys } };
     if (cidades?.length)  where.cidade = { in: cidades };
     if (bairros?.length)  where.bairro = { in: bairros };
+    if (labels?.length)   where.labels = { hasSome: labels };
+    if (candidateIds)     where.id     = { in: Array.from(candidateIds) };
     const cs = await prisma.contact.findMany({ where, select: { id: true } });
     cs.forEach(c => ids.add(c.id));
   }
@@ -50,7 +62,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     arr = arr.filter(id => !otherSet.has(id));
   }
 
-  // Quantos já estão nesta campanha
   const already = await prisma.campaignContact.count({
     where: { campaignId: params.id, contactId: { in: arr } },
   });

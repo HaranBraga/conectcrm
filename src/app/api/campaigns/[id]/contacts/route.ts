@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcast } from "@/lib/sse";
+import { getDescendantContactIds } from "@/lib/contacts";
 
 export const dynamic = "force-dynamic";
 
@@ -42,18 +43,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 /**
- * Resolve filtros em uma lista de contactIds.
- * Filtros aceitos:
+ * Resolve filtros em uma lista de contactIds. Filtros aceitos:
  *  - contactIds: string[]
  *  - reuniaoId + mode ("all" | "anfitrioes" | "presentes")
- *  - roleKeys: string[]
- *  - cidades: string[]
- *  - bairros: string[]
+ *  - roleKeys, cidades, bairros, labels: string[]
+ *  - liderIds: string[]               // IDs dos líderes
+ *  - liderDepth: "direct" | "all"      // profundidade da rede (default "direct")
  *  - excludeInAnyCampaign: boolean
  */
 async function resolveContactIds(filters: any, campaignId: string): Promise<string[]> {
   const ids = new Set<string>();
-  const { contactIds, reuniaoId, mode, roleKeys, cidades, bairros, excludeInAnyCampaign } = filters;
+  const {
+    contactIds, reuniaoId, mode,
+    roleKeys, cidades, bairros, labels,
+    liderIds, liderDepth = "direct",
+    excludeInAnyCampaign,
+  } = filters;
 
   if (Array.isArray(contactIds)) contactIds.forEach((id: string) => ids.add(id));
 
@@ -73,15 +78,29 @@ async function resolveContactIds(filters: any, campaignId: string): Promise<stri
     }
   }
 
-  // Filtro por critérios (combinados via AND)
+  // Filtros por critérios — TODOS combinados via AND (interseção de conjuntos)
   const hasCriteria = (Array.isArray(roleKeys) && roleKeys.length) ||
-                      (Array.isArray(cidades)  && cidades.length) ||
-                      (Array.isArray(bairros)  && bairros.length);
+                      (Array.isArray(cidades)  && cidades.length)  ||
+                      (Array.isArray(bairros)  && bairros.length)  ||
+                      (Array.isArray(labels)   && labels.length)   ||
+                      (Array.isArray(liderIds) && liderIds.length);
+
   if (hasCriteria) {
+    let candidateIds: Set<string> | null = null;
+
+    // Se houver líderes, primeiro restringir aos contatos da rede
+    if (Array.isArray(liderIds) && liderIds.length > 0) {
+      const desc = await getDescendantContactIds(liderIds, liderDepth === "all" ? "all" : "direct");
+      candidateIds = new Set(desc);
+    }
+
     const where: any = {};
     if (roleKeys?.length) where.role   = { key: { in: roleKeys } };
     if (cidades?.length)  where.cidade = { in: cidades };
     if (bairros?.length)  where.bairro = { in: bairros };
+    if (labels?.length)   where.labels = { hasSome: labels };
+    if (candidateIds)     where.id     = { in: Array.from(candidateIds) };
+
     const cs = await prisma.contact.findMany({ where, select: { id: true } });
     cs.forEach(c => ids.add(c.id));
   }

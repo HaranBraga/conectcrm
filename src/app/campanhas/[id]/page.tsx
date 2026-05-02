@@ -81,6 +81,69 @@ function MultiToggle({ options, selected, onToggle }: {
   );
 }
 
+function LeaderPicker({ selected, onChange }: { selected: any[]; onChange: (next: any[]) => void }) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const timer = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/contacts/leaders?search=${encodeURIComponent(q)}&limit=12`);
+        setResults(await r.json());
+      } finally { setLoading(false); }
+    }, 250);
+    return () => clearTimeout(timer.current);
+  }, [q]);
+
+  function pick(c: any) {
+    if (selected.find(s => s.id === c.id)) return;
+    onChange([...selected, c]);
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 bg-gray-50">
+        <Search size={12} className="text-gray-400" />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar líder por nome ou telefone..."
+          className="flex-1 text-xs bg-transparent focus:outline-none" />
+        {selected.length > 0 && (
+          <button onClick={() => onChange([])} className="text-[10px] text-red-400 hover:text-red-600">limpar ({selected.length})</button>
+        )}
+      </div>
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 p-2 border-b border-gray-100 bg-amber-50/30">
+          {selected.map(s => (
+            <div key={s.id} className="flex items-center gap-1.5 bg-white border border-amber-300 rounded-lg px-2 py-1">
+              <span className="text-xs text-amber-900">{s.name}</span>
+              <span className="text-[10px] text-amber-500">{s.childCount} contatos</span>
+              <button onClick={() => onChange(selected.filter(x => x.id !== s.id))} className="text-amber-400 hover:text-red-500"><X size={11} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="max-h-40 overflow-y-auto">
+        {loading && <p className="px-3 py-2 text-xs text-gray-400">Buscando...</p>}
+        {!loading && results.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">Nenhum líder encontrado</p>}
+        {!loading && results.map(c => (
+          <button key={c.id} onClick={() => pick(c)} disabled={selected.some(s => s.id === c.id)}
+            className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-gray-50 text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed">
+            <span className="flex-1 text-gray-700">{c.name}</span>
+            {c.role && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                style={{ color: c.role.color, backgroundColor: c.role.bgColor }}>{c.role.label}</span>
+            )}
+            <span className="text-[10px] text-gray-400">{c.childCount} contatos</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MultiSearchPicker({ options, selected, onChange, placeholder }: {
   options: { value: string; count?: number }[];
   selected: string[];
@@ -133,6 +196,9 @@ function AddContactsModal({ campaignId, onClose, onAdded }: any) {
   const [advRoleKeys, setAdvRoleKeys] = useState<string[]>([]);
   const [advCidades, setAdvCidades]   = useState<string[]>([]);
   const [advBairros, setAdvBairros]   = useState<string[]>([]);
+  const [advLabels, setAdvLabels]     = useState<string[]>([]);
+  const [advLeaders, setAdvLeaders]   = useState<any[]>([]);
+  const [advLeaderDepth, setAdvLeaderDepth] = useState<"direct" | "all">("all");
   const [advExclude, setAdvExclude]   = useState(false);
 
   const [preview, setPreview] = useState<{ total: number; novos: number; jaNaCampanha: number } | null>(null);
@@ -155,6 +221,8 @@ function AddContactsModal({ campaignId, onClose, onAdded }: any) {
       if (advRoleKeys.length) body.roleKeys = advRoleKeys;
       if (advCidades.length)  body.cidades  = advCidades;
       if (advBairros.length)  body.bairros  = advBairros;
+      if (advLabels.length)   body.labels   = advLabels;
+      if (advLeaders.length)  { body.liderIds = advLeaders.map(l => l.id); body.liderDepth = advLeaderDepth; }
       body.excludeInAnyCampaign = advExclude;
     }
     return body;
@@ -165,7 +233,7 @@ function AddContactsModal({ campaignId, onClose, onAdded }: any) {
     clearTimeout(previewTimer.current);
     if (origem === "manual") { setPreview(null); return; }
     if (origem === "criterio" && roleKeys.length === 0) { setPreview(null); return; }
-    if (origem === "avancado" && advRoleKeys.length === 0 && advCidades.length === 0 && advBairros.length === 0) { setPreview(null); return; }
+    if (origem === "avancado" && advRoleKeys.length === 0 && advCidades.length === 0 && advBairros.length === 0 && advLabels.length === 0 && advLeaders.length === 0) { setPreview(null); return; }
     previewTimer.current = setTimeout(async () => {
       setPreviewing(true);
       try {
@@ -178,7 +246,7 @@ function AddContactsModal({ campaignId, onClose, onAdded }: any) {
     }, 350);
     return () => clearTimeout(previewTimer.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [origem, roleKeys, excludeInAnyCampaign, advRoleKeys, advCidades, advBairros, advExclude]);
+  }, [origem, roleKeys, excludeInAnyCampaign, advRoleKeys, advCidades, advBairros, advLabels, advLeaders, advLeaderDepth, advExclude]);
 
   function toggle<T>(arr: T[], v: T): T[] { return arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]; }
 
@@ -253,8 +321,29 @@ function AddContactsModal({ campaignId, onClose, onAdded }: any) {
         )}
 
         {origem === "avancado" && (
-          <div className="flex flex-col gap-4">
-            <p className="text-xs text-gray-500 italic">Combine quantos filtros quiser. Os critérios são aplicados em conjunto (E).</p>
+          <div className="flex flex-col gap-4 max-h-[500px] overflow-y-auto pr-2">
+            <p className="text-xs text-gray-500 italic">Combine quantos filtros quiser. Os critérios se cruzam (E lógico).</p>
+
+            {/* Líderes */}
+            <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-3">
+              <p className="text-xs font-semibold text-amber-700 mb-1.5">Rede de líder</p>
+              <p className="text-[11px] text-gray-500 mb-2">Selecione um ou mais líderes — apenas contatos abaixo deles na hierarquia entrarão.</p>
+              <LeaderPicker selected={advLeaders} onChange={setAdvLeaders} />
+              {advLeaders.length > 0 && (
+                <div className="flex gap-1.5 mt-2">
+                  {([
+                    { key: "direct", label: "Filhos diretos" },
+                    { key: "all",    label: "Toda a rede (descendentes)" },
+                  ] as const).map(opt => (
+                    <button key={opt.key} type="button" onClick={() => setAdvLeaderDepth(opt.key)}
+                      className={`text-xs px-3 py-1 rounded-full border font-medium ${advLeaderDepth === opt.key ? "bg-amber-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div>
               <p className="text-xs font-semibold text-gray-500 mb-1.5">Papéis</p>
               <MultiToggle
@@ -263,6 +352,19 @@ function AddContactsModal({ campaignId, onClose, onAdded }: any) {
                 onToggle={(v) => setAdvRoleKeys(prev => toggle(prev, v))}
               />
             </div>
+
+            {(opts?.labels ?? []).length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-1.5">Etiquetas</p>
+                <MultiSearchPicker
+                  options={opts.labels.map((l: any) => ({ value: l.value, count: l.count }))}
+                  selected={advLabels}
+                  onChange={setAdvLabels}
+                  placeholder="Filtrar etiquetas..."
+                />
+              </div>
+            )}
+
             {(opts?.cidades ?? []).length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-gray-500 mb-1.5">Cidades</p>
@@ -657,6 +759,16 @@ function ContactRow({ cc, campaign, tags, onPatch, onDelete }: any) {
         </div>
       </div>
 
+      {cc.status === "FALHOU" && (
+        <span className="text-[11px] px-2 py-0.5 rounded-full font-medium shrink-0 bg-red-50 text-red-600 border border-red-200" title={cc.notes ?? ""}>
+          falhou
+        </span>
+      )}
+      {cc.status === "IGNOROU" && !tag && (
+        <span className="text-[11px] px-2 py-0.5 rounded-full font-medium shrink-0 bg-amber-50 text-amber-700 border border-amber-200" title={cc.notes ?? ""}>
+          ignorado
+        </span>
+      )}
       {tag && (
         <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0"
           style={{ color: tag.color, backgroundColor: tag.bgColor }}>{tag.label}</span>
@@ -704,88 +816,6 @@ function ContactRow({ cc, campaign, tags, onPatch, onDelete }: any) {
   );
 }
 
-// ─── Aba Reuniões ────────────────────────────────────────────────────────────
-
-function ReunioesTab({ campaignId, onAdded }: { campaignId: string; onAdded: () => void }) {
-  const [reunioes, setReunioes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    fetch("/api/reunioes").then(r => r.json()).then(d => { setReunioes(d); setLoading(false); });
-  }, []);
-
-  async function add(reuniaoId: string, mode: "all" | "anfitrioes" | "presentes") {
-    setAdding(reuniaoId + mode);
-    try {
-      const r = await fetch(`/api/campaigns/${campaignId}/contacts`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reuniaoId, mode }),
-      });
-      if (!r.ok) { const d = await r.json(); toast.error(d.error ?? "Erro"); return; }
-      const d = await r.json();
-      toast.success(`${d.added} contatos adicionados${d.skipped ? ` · ${d.skipped} já estavam` : ""}`);
-      onAdded();
-    } finally { setAdding(null); }
-  }
-
-  const filtered = reunioes.filter(r => !search.trim() || r.titulo?.toLowerCase().includes(search.toLowerCase()));
-
-  return (
-    <div className="max-w-4xl mx-auto p-6">
-      <p className="text-sm text-gray-500 mb-4">Adicione contatos a partir de reuniões realizadas. Escolha o modo (todos, só anfitriões, ou presentes sem anfitriões).</p>
-      <div className="relative max-w-sm mb-4">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar reunião..."
-          className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
-      </div>
-      {loading ? (
-        <p className="text-center text-gray-400 py-10">Carregando...</p>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-          <Users size={36} className="mb-3 opacity-30" />
-          <p className="font-medium">Nenhuma reunião encontrada</p>
-        </div>
-      ) : (
-        <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
-          {filtered.map(r => {
-            const totPres = r._count?.presentes ?? 0;
-            const totAnf  = r.anfitrioes?.length ?? 0;
-            return (
-              <div key={r.id} className="px-4 py-3 flex items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 text-sm truncate">{r.titulo}</p>
-                  <div className="flex items-center gap-3 text-xs text-gray-400 mt-0.5">
-                    <span>{format(new Date(r.dataHora), "dd/MM/yyyy", { locale: ptBR })}</span>
-                    <span>{totPres} presentes</span>
-                    <span>{totAnf} anfitriões</span>
-                    {r.local && <span className="truncate">{r.local}</span>}
-                  </div>
-                </div>
-                <div className="flex gap-1.5 shrink-0">
-                  <button disabled={!!adding} onClick={() => add(r.id, "all")}
-                    className="text-xs px-2.5 py-1.5 border border-gray-200 hover:border-brand-400 hover:text-brand-600 rounded-lg disabled:opacity-50">
-                    {adding === r.id + "all" ? "..." : "Todos"}
-                  </button>
-                  <button disabled={!!adding} onClick={() => add(r.id, "anfitrioes")}
-                    className="text-xs px-2.5 py-1.5 border border-gray-200 hover:border-amber-400 hover:text-amber-600 rounded-lg disabled:opacity-50">
-                    {adding === r.id + "anfitrioes" ? "..." : "Anfitriões"}
-                  </button>
-                  <button disabled={!!adding} onClick={() => add(r.id, "presentes")}
-                    className="text-xs px-2.5 py-1.5 border border-gray-200 hover:border-indigo-400 hover:text-indigo-600 rounded-lg disabled:opacity-50">
-                    {adding === r.id + "presentes" ? "..." : "Presentes"}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Página ──────────────────────────────────────────────────────────────────
 
 export default function CampanhaDetailPage() {
@@ -794,7 +824,7 @@ export default function CampanhaDetailPage() {
   const [campaign, setCampaign] = useState<any | null>(null);
   const [contacts, setContacts] = useState<any[]>([]);
   const [contactsTotal, setContactsTotal] = useState(0);
-  const [tab, setTab] = useState<"PENDENTE" | "ENVIADO" | "REUNIOES" | "CONFIG">("PENDENTE");
+  const [tab, setTab] = useState<"PENDENTE" | "ENVIADO" | "CONFIG">("PENDENTE");
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
@@ -869,8 +899,7 @@ export default function CampanhaDetailPage() {
         <div className="flex gap-1 px-6 overflow-x-auto">
           {[
             { key: "PENDENTE", label: "Pendentes",  icon: Clock,     count: campaign.counts?.PENDENTE ?? 0 },
-            { key: "ENVIADO",  label: "Processados", icon: CheckCheck, count: (campaign.counts?.ENVIADO ?? 0) + (campaign.counts?.RESPONDEU ?? 0) + (campaign.counts?.IGNOROU ?? 0) },
-            { key: "REUNIOES", label: "Reuniões",   icon: Users,      count: null },
+            { key: "ENVIADO",  label: "Processados", icon: CheckCheck, count: (campaign.counts?.ENVIADO ?? 0) + (campaign.counts?.RESPONDEU ?? 0) + (campaign.counts?.IGNOROU ?? 0) + (campaign.counts?.FALHOU ?? 0) },
             { key: "CONFIG",   label: "Configuração", icon: Settings, count: null },
           ].map(t => {
             const Icon = t.icon;
@@ -939,10 +968,6 @@ export default function CampanhaDetailPage() {
               </div>
             )}
           </div>
-        )}
-
-        {tab === "REUNIOES" && (
-          <ReunioesTab campaignId={id} onAdded={() => { loadContacts(); loadCampaign(); }} />
         )}
 
         {tab === "CONFIG" && (
