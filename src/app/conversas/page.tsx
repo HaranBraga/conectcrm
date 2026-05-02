@@ -3,13 +3,14 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search, Send, X, UserPlus, RefreshCw,
   CheckCheck, Paperclip, Link2, FileText, Mic,
-  MessageSquarePlus, Archive, ArchiveRestore, ClipboardList,
+  MessageSquarePlus, Archive, ArchiveRestore,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { LabelManager, getLabelStyle, type LabelDef } from "@/components/ui/LabelManager";
 import { NewConversationModal } from "@/components/ui/NewConversationModal";
 import { CampaignBadges } from "@/components/ui/CampaignBadges";
+import { DemandaInline } from "@/components/ui/DemandaInline";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
@@ -488,12 +489,11 @@ export default function ConversasPage() {
                 labelDefs={labelDefs}
                 onDefsChange={setLabelDefs}
               />
-              <button
-                onClick={() => router.push(`/demandas?contactId=${selected.contactId}&conversaId=${selected.id}`)}
-                title="Criar demanda a partir desta conversa"
-                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 border border-transparent hover:border-indigo-100 px-3 py-1.5 rounded-lg transition-colors">
-                <ClipboardList size={12} /> Demanda
-              </button>
+              <DemandaInline
+                contactId={selected.contactId}
+                contactName={selected.contact?.name ?? selected.contact?.phone ?? "contato"}
+                conversaId={selected.id}
+              />
               {showArchived ? (
                 <button onClick={reopenConversation}
                   className="flex items-center gap-1.5 text-xs bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 px-3 py-1.5 rounded-lg font-medium">

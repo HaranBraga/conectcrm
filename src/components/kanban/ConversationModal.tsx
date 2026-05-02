@@ -1,10 +1,10 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { LabelManager, type LabelDef } from "@/components/ui/LabelManager";
-import { Send, Clock, Archive, ClipboardList, Paperclip, CheckCheck, FileText, Mic } from "lucide-react";
+import { Send, Clock, Archive, Paperclip, CheckCheck, FileText, Mic } from "lucide-react";
+import { DemandaInline } from "@/components/ui/DemandaInline";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
@@ -81,7 +81,6 @@ interface Props {
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
 export function ConversationModal({ conversation, onClose, onCloseConversation, labelDefs, onLabelsUpdate }: Props) {
-  const router = useRouter();
   const [messages, setMessages]       = useState<any[]>([]);
   const [text, setText]               = useState("");
   const [sending, setSending]         = useState(false);
@@ -194,11 +193,11 @@ export function ConversationModal({ conversation, onClose, onCloseConversation, 
             onUpdate={handleLabelsUpdate}
             labelDefs={labelDefs}
           />
-          <button
-            onClick={() => { router.push(`/demandas?contactId=${conversation.contactId}&conversaId=${conversation.id}`); onClose(); }}
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 px-2 py-1.5 rounded-lg transition-colors">
-            <ClipboardList size={13} /> Demanda
-          </button>
+          <DemandaInline
+            contactId={conversation.contactId}
+            contactName={conversation.contact?.name ?? conversation.contact?.phone ?? "contato"}
+            conversaId={conversation.id}
+          />
           <button onClick={closeConversation}
             className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors">
             <Archive size={13} /> Fechar
