@@ -333,7 +333,11 @@ export default function ConversasPage() {
     setSending(true);
     try {
       const r = await fetch(`/api/conversations/${selected.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      if (!r.ok) { toast.error("Erro ao enviar"); return; }
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        toast.error(d.error ?? "Erro ao enviar");
+        return;
+      }
       const msg = await r.json();
       setMessages(prev => {
         const exists = prev.some(m => m.id === msg.id);

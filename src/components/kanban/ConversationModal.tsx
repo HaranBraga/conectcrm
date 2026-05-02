@@ -120,6 +120,11 @@ export function ConversationModal({ conversation, onClose, onCloseConversation, 
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
       });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        toast.error(d.error ?? "Erro ao enviar");
+        return;
+      }
       const msg = await r.json();
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
       setText("");
@@ -139,6 +144,11 @@ export function ConversationModal({ conversation, onClose, onCloseConversation, 
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ base64, mimeType: file.type, fileName: file.name }),
       });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        toast.error(d.error ?? "Erro ao enviar arquivo");
+        return;
+      }
       const msg = await r.json();
       setMessages(prev => [...prev, msg]);
     } catch { toast.error("Erro ao enviar arquivo"); }

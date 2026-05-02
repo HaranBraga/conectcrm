@@ -44,7 +44,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   try {
     if (linkUrl) {
-      await sendLink(conversation.contact.phone, linkUrl, linkTitle, linkDescription);
+      const result = await sendLink(conversation.contact.phone, linkUrl, linkTitle, linkDescription);
+      whatsappMsgId = result?.key?.id;
       content = linkTitle ? `${linkTitle}\n${linkUrl}` : `🔗 ${linkUrl}`;
     } else if (base64 && mimeType && fileName) {
       // Upload de arquivo real via base64
@@ -52,12 +53,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         mimeType.startsWith("image/") ? "image" :
         mimeType.startsWith("video/") ? "video" :
         mimeType.startsWith("audio/") ? "audio" : "document";
-      await sendMediaBase64(conversation.contact.phone, base64, mimeType, fileName, type, message || undefined);
+      const result = await sendMediaBase64(conversation.contact.phone, base64, mimeType, fileName, type, message || undefined);
+      whatsappMsgId = result?.key?.id;
       const emoji = type === "image" ? "🖼️" : type === "video" ? "🎥" : type === "audio" ? "🎵" : "📄";
       content = message ? `${emoji} ${message}` : `${emoji} ${fileName}`;
       savedMediaType = type;
     } else if (mediaUrl && mediaType) {
-      await sendMedia(conversation.contact.phone, mediaUrl, mediaType, message);
+      const result = await sendMedia(conversation.contact.phone, mediaUrl, mediaType, message);
+      whatsappMsgId = result?.key?.id;
       const emoji = mediaType === "image" ? "🖼️" : mediaType === "video" ? "🎥" : "📄";
       content = message ? `${emoji} ${message}` : `${emoji} ${mediaType}`;
       savedMediaType = mediaType;
@@ -65,8 +68,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       const result = await sendText(conversation.contact.phone, message);
       whatsappMsgId = result?.key?.id;
     }
-  } catch (err) {
-    console.error("Evolution API error:", err);
+  } catch (err: any) {
+    console.error("Evolution API error:", err?.response?.data ?? err);
+    const detail = err?.response?.data?.message ?? err?.response?.data?.error ?? err?.message ?? "erro desconhecido";
+    return NextResponse.json({ error: `Falha no envio: ${detail}` }, { status: 502 });
   }
 
   const msg = await prisma.message.create({
