@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Send, Settings, Zap, MessageSquare, ClipboardList, CalendarDays, UsersRound } from "lucide-react";
+import { LayoutDashboard, Users, Megaphone, Settings, Zap, MessageSquare, ClipboardList, CalendarDays, UsersRound } from "lucide-react";
 
 const nav = [
   { href: "/conversas",     label: "Conversas",    icon: MessageSquare },
@@ -10,7 +10,7 @@ const nav = [
   { href: "/demandas",      label: "Demandas",      icon: ClipboardList },
   { href: "/reunioes",      label: "Reuniões",      icon: UsersRound },
   { href: "/contatos",      label: "Contatos",      icon: Users },
-  { href: "/disparos",      label: "Disparos",      icon: Send },
+  { href: "/campanhas",     label: "Campanhas",     icon: Megaphone },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
@@ -26,7 +26,7 @@ export function Sidebar() {
       </div>
       <nav className="flex flex-col gap-1 p-3 flex-1">
         {nav.map(({ href, label, icon: Icon }) => {
-          const active = path === href;
+          const active = href === "/" ? path === "/" : path === href || path?.startsWith(href + "/");
           return (
             <Link
               key={href}

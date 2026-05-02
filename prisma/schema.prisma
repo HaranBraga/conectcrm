@@ -74,6 +74,10 @@ model Contact {
   reuniaoPresentes  ReuniaoPresente[]  @relation("ReuniaoPresentes")
   reuniaoAvaliacoes ReuniaoAvaliacao[] @relation("ReuniaoAvaliadores")
 
+  campaigns         CampaignContact[]  @relation("CampaignTargetContact")
+  campaignsAssigned CampaignContact[]  @relation("CampaignAssignedTo")
+  campaignsSent     CampaignContact[]  @relation("CampaignSentBy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -321,4 +325,67 @@ model DispatchResult {
   success     Boolean  @default(false)
   error       String?
   sentAt      DateTime @default(now())
+}
+
+// ─── Campanhas ─────────────────────────────────────────────────────────────────
+
+model Campaign {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  goal            String?
+  status          String   @default("ATIVA")     // ATIVA | PAUSADA | CONCLUIDA
+  messageTemplate String                          // suporta {{nome}}, {{primeiroNome}}, {{telefone}}, {{lider}}
+  mediaUrl        String?                         // /campaigns/uuid.ext (servido em public/)
+  mediaType       String?                         // image | video
+  linkUrl         String?                         // link com prévia
+  defaultDelayMs  Int      @default(2000)         // intervalo entre envios em modo lote (futuro)
+
+  contacts        CampaignContact[]
+  responseTags    CampaignResponseTag[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+}
+
+model CampaignContact {
+  id            String    @id @default(cuid())
+  campaignId    String
+  campaign      Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId     String
+  contact       Contact   @relation("CampaignTargetContact", fields: [contactId], references: [id], onDelete: Cascade)
+
+  status        String    @default("PENDENTE")    // PENDENTE | ENVIADO | RESPONDEU | IGNOROU
+  assignedToId  String?                            // líder/coordenador atribuído (override do parent)
+  assignedTo    Contact?  @relation("CampaignAssignedTo", fields: [assignedToId], references: [id])
+  sentById      String?
+  sentBy        Contact?  @relation("CampaignSentBy", fields: [sentById], references: [id])
+  sentAt        DateTime?
+  sentMessage   String?                            // mensagem final com variáveis resolvidas
+
+  responseTagId String?
+  responseTag   CampaignResponseTag? @relation(fields: [responseTagId], references: [id])
+  respondedAt   DateTime?
+  notes         String?
+
+  addedAt       DateTime  @default(now())
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId, status])
+  @@index([contactId])
+}
+
+model CampaignResponseTag {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  label      String
+  color      String   @default("#6366f1")
+  bgColor    String   @default("#eef2ff")
+  order      Int      @default(0)
+  contacts   CampaignContact[]
+
+  @@index([campaignId])
 }

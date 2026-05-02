@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { LabelManager, getLabelStyle, type LabelDef } from "@/components/ui/LabelManager";
 import { NewConversationModal } from "@/components/ui/NewConversationModal";
+import { CampaignBadges } from "@/components/ui/CampaignBadges";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
@@ -506,6 +507,8 @@ export default function ConversasPage() {
               )}
             </div>
           </div>
+
+          {selected.contactId && <CampaignBadges contactId={selected.contactId} />}
 
           {/* Mensagens */}
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5 bg-[#f0f2f5]">
