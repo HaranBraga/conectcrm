@@ -27,7 +27,7 @@ const NAV = [
   { module: "campanhas", href: "/campanhas", label: "Campanhas" },
 ];
 
-type User = { id: string; name: string; email: string; isAdmin: boolean; modules: string[] };
+type User = { id: string; name: string; username?: string | null; isAdmin: boolean; modules: string[] };
 
 export function Sidebar({ user }: { user: User }) {
   const path = usePathname();
@@ -81,7 +81,7 @@ export function Sidebar({ user }: { user: User }) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-gray-700 truncate">{user.name}</p>
-            <p className="text-[10px] text-gray-400 truncate">{user.isAdmin ? "Administrador" : user.email}</p>
+            <p className="text-[10px] text-gray-400 truncate">{user.isAdmin ? "Administrador" : (user.username ? `@${user.username}` : "")}</p>
           </div>
           <button onClick={logout} title="Sair" className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500">
             <LogOut size={14} />

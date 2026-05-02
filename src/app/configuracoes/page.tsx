@@ -183,7 +183,7 @@ function SectionHeader({ title, description, action }: { title: string; descript
 
 function UserForm({ initial, onSave, onClose }: { initial?: any; onSave: () => void; onClose: () => void }) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [email, setEmail] = useState(initial?.email ?? "");
+  const [username, setUsername] = useState(initial?.username ?? "");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [isAdmin, setIsAdmin] = useState(initial?.isAdmin ?? false);
@@ -201,7 +201,7 @@ function UserForm({ initial, onSave, onClose }: { initial?: any; onSave: () => v
     try {
       const method = initial?.id ? "PUT" : "POST";
       const url    = initial?.id ? `/api/users/${initial.id}` : "/api/users";
-      const body: any = { name, email, isAdmin, active, modules };
+      const body: any = { name, username, isAdmin, active, modules };
       if (password) body.password = password;
       const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (!r.ok) { const d = await r.json(); toast.error(d.error ?? "Erro"); return; }
@@ -218,8 +218,8 @@ function UserForm({ initial, onSave, onClose }: { initial?: any; onSave: () => v
           <input required value={name} onChange={e => setName(e.target.value)} className={INP} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Email *</label>
-          <input required type="email" value={email} onChange={e => setEmail(e.target.value)} className={INP} />
+          <label className="block text-xs font-medium text-gray-600 mb-1">Usuário (login) *</label>
+          <input required value={username} onChange={e => setUsername(e.target.value.toLowerCase())} placeholder="ex: joao_silva" autoCapitalize="none" spellCheck={false} className={INP} />
         </div>
       </div>
 
@@ -473,7 +473,7 @@ export default function ConfiguracoesPage() {
                           {u.isAdmin && <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium flex items-center gap-1"><ShieldCheck size={9} />Admin</span>}
                           {!u.active && <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">Inativo</span>}
                         </div>
-                        <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                        <p className="text-xs text-gray-400 truncate">@{u.username ?? "(sem usuário)"}</p>
                         {!u.isAdmin && (
                           <p className="text-[11px] text-gray-400 mt-0.5">
                             {u.modules?.length === 0 ? "Sem módulos liberados" : `${u.modules.length} módulo(s): ${u.modules.join(", ")}`}

@@ -105,26 +105,45 @@ async function seedCalendarios() {
 }
 
 async function seedAdmin() {
-  const count = await prisma.user.count();
-  if (count > 0) {
-    console.log(`✅ Usuários: ${count} já cadastrados`);
+  const userCount = await prisma.user.count();
+
+  if (userCount === 0) {
+    const username = (process.env.ADMIN_USERNAME || "admin").toLowerCase();
+    const password = process.env.ADMIN_PASSWORD || "admin123";
+    const hashed = await bcrypt.hash(password, 10);
+    await prisma.user.create({
+      data: {
+        name: "Administrador",
+        username,
+        password: hashed,
+        isAdmin: true,
+        modules: [],
+        active: true,
+      },
+    });
+    console.log(`✅ Admin inicial criado — usuário: ${username}, senha: ${password}`);
+    console.log("   ⚠ Mude a senha imediatamente em Configurações > Usuários");
     return;
   }
-  const email = (process.env.ADMIN_EMAIL || "admin@admin.com").toLowerCase();
-  const password = process.env.ADMIN_PASSWORD || "admin123";
-  const hashed = await bcrypt.hash(password, 10);
-  await prisma.user.create({
-    data: {
-      name: "Administrador",
-      email,
-      password: hashed,
-      isAdmin: true,
-      modules: [],
-      active: true,
-    },
+
+  // Migra admins existentes que ainda não têm username
+  const adminsSemUsername = await prisma.user.findMany({
+    where: { isAdmin: true, username: null },
+    select: { id: true, name: true },
   });
-  console.log(`✅ Admin inicial criado — email: ${email}, senha: ${password}`);
-  console.log("   ⚠ Mude a senha imediatamente em Configurações > Usuários");
+  for (const a of adminsSemUsername) {
+    let attempt = "admin";
+    let n = 0;
+    // Garante unicidade
+    while (await prisma.user.findUnique({ where: { username: attempt } })) {
+      n += 1;
+      attempt = `admin${n}`;
+      if (n > 50) { attempt = `admin-${a.id.slice(-6)}`; break; }
+    }
+    await prisma.user.update({ where: { id: a.id }, data: { username: attempt } });
+    console.log(`✅ Username "${attempt}" atribuído ao admin "${a.name}"`);
+  }
+  console.log(`✅ Usuários: ${userCount} cadastrados`);
 }
 
 async function main() {

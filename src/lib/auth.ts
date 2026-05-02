@@ -17,7 +17,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 export type CurrentUser = {
   id: string;
   name: string;
-  email: string;
+  username: string | null;
   isAdmin: boolean;
   modules: string[];
 };
@@ -30,10 +30,10 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (!payload) return null;
   const user = await prisma.user.findUnique({
     where: { id: payload.uid },
-    select: { id: true, name: true, email: true, isAdmin: true, modules: true, active: true },
+    select: { id: true, name: true, username: true, isAdmin: true, modules: true, active: true },
   });
   if (!user || !user.active) return null;
-  return user;
+  return { id: user.id, name: user.name, username: user.username, isAdmin: user.isAdmin, modules: user.modules };
 }
 
 export async function requireUser(): Promise<CurrentUser> {

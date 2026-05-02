@@ -3,7 +3,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 
 type Props = {
-  user: { id: string; name: string; email: string; isAdmin: boolean; modules: string[] } | null;
+  user: { id: string; name: string; username?: string | null; isAdmin: boolean; modules: string[] } | null;
   children: React.ReactNode;
 };
 

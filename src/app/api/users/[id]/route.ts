@@ -5,6 +5,8 @@ import { getCurrentUser, hashPassword } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const USERNAME_RE = /^[a-z0-9._-]{3,32}$/;
+
 async function requireAdminOrError() {
   const u = await getCurrentUser();
   if (!u) return { error: NextResponse.json({ error: "Não autenticado" }, { status: 401 }), user: null };
@@ -17,9 +19,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (error) return error;
 
   const body = await req.json();
-  const { name, email, password, isAdmin, modules, active } = body;
+  const { name, username, password, isAdmin, modules, active } = body;
 
-  // Não permite o próprio admin se rebaixar (evita lockout)
   if (actor!.id === params.id && isAdmin === false) {
     return NextResponse.json({ error: "Você não pode tirar seu próprio admin" }, { status: 400 });
   }
@@ -29,7 +30,13 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   const data: any = {};
   if (name      !== undefined) data.name = String(name).trim();
-  if (email     !== undefined) data.email = String(email).toLowerCase().trim();
+  if (username  !== undefined) {
+    const uname = String(username).toLowerCase().trim();
+    if (!USERNAME_RE.test(uname)) return NextResponse.json({ error: "Usuário inválido" }, { status: 400 });
+    const exists = await prisma.user.findUnique({ where: { username: uname } });
+    if (exists && exists.id !== params.id) return NextResponse.json({ error: "Usuário já existe" }, { status: 409 });
+    data.username = uname;
+  }
   if (isAdmin   !== undefined) data.isAdmin = !!isAdmin;
   if (modules   !== undefined) data.modules = Array.isArray(modules) ? modules : [];
   if (active    !== undefined) data.active = !!active;
@@ -41,7 +48,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const updated = await prisma.user.update({
     where: { id: params.id },
     data,
-    select: { id: true, name: true, email: true, isAdmin: true, modules: true, active: true, lastLogin: true },
+    select: { id: true, name: true, username: true, isAdmin: true, modules: true, active: true, lastLogin: true },
   });
   return NextResponse.json(updated);
 }
