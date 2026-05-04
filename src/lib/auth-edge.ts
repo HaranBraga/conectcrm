@@ -9,11 +9,11 @@ export const SESSION_COOKIE = "session";
  * Por isso a checagem fica nas funções abaixo, executadas só em runtime.
  */
 function getSecret(): Uint8Array {
-  const raw = process.env.AUTH_getSecret();
+  const raw = process.env.AUTH_SECRET;
   if (process.env.NODE_ENV === "production" && (!raw || raw.length < 32)) {
     throw new Error(
-      "AUTH_getSecret() não está configurada (ou é muito curta). Em produção, defina " +
-      "uma string aleatória de pelo menos 32 caracteres na variável AUTH_getSecret(). " +
+      "AUTH_SECRET não está configurada (ou é muito curta). Em produção, defina " +
+      "uma string aleatória de pelo menos 32 caracteres na variável AUTH_SECRET. " +
       "Gere uma com: openssl rand -hex 32"
     );
   }
