@@ -85,6 +85,18 @@ function extractText(data: any): string {
 
 export async function POST(req: NextRequest) {
   try {
+    // Validação opcional de token compartilhado.
+    // Configure WEBHOOK_TOKEN no env e o mesmo header `x-webhook-token`
+    // no dispatch do Evolution. Se WEBHOOK_TOKEN não estiver setado,
+    // o webhook fica aberto (compatibilidade com setup atual).
+    const expected = process.env.WEBHOOK_TOKEN;
+    if (expected) {
+      const got = req.headers.get("x-webhook-token");
+      if (got !== expected) {
+        return NextResponse.json({ error: "Token inválido" }, { status: 401 });
+      }
+    }
+
     const body = await req.json();
     const { event, data } = body;
 

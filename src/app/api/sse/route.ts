@@ -1,9 +1,18 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { addClient, removeClient } from "@/lib/sse";
+import { verifySession, SESSION_COOKIE } from "@/lib/auth-edge";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-export function GET(req: NextRequest) {
+export async function GET(req: NextRequest) {
+  // Exige sessão válida — eventos do CRM não são públicos
+  const token = req.cookies.get(SESSION_COOKIE)?.value;
+  const session = token ? await verifySession(token) : null;
+  if (!session) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
+
   let ctrl: ReadableStreamDefaultController<Uint8Array>;
 
   const stream = new ReadableStream<Uint8Array>({

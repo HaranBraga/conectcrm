@@ -76,13 +76,15 @@ export function Sidebar({ user }: { user: User }) {
 
       <div className="px-3 py-3 border-t border-gray-100">
         <div className="flex items-center gap-2 px-2 py-2 rounded-lg">
-          <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-bold shrink-0">
-            {user.name?.[0]?.toUpperCase() ?? "?"}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-gray-700 truncate">{user.name}</p>
-            <p className="text-[10px] text-gray-400 truncate">{user.isAdmin ? "Administrador" : (user.username ? `@${user.username}` : "")}</p>
-          </div>
+          <Link href="/perfil" className="flex items-center gap-2 flex-1 min-w-0 hover:opacity-80" title="Meu perfil">
+            <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-bold shrink-0">
+              {user.name?.[0]?.toUpperCase() ?? "?"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-gray-700 truncate">{user.name}</p>
+              <p className="text-[10px] text-gray-400 truncate">{user.isAdmin ? "Administrador" : (user.username ? `@${user.username}` : "")}</p>
+            </div>
+          </Link>
           <button onClick={logout} title="Sair" className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500">
             <LogOut size={14} />
           </button>

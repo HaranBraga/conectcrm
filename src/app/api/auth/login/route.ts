@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword, signSession, SESSION_COOKIE } from "@/lib/auth";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,6 +13,17 @@ export async function POST(req: NextRequest) {
   }
 
   const uname = String(username).toLowerCase().trim();
+
+  // Rate limit: 8 tentativas por IP+username em 15 min
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(`login:${ip}:${uname}`, { limit: 8, windowMs: 15 * 60_000 });
+  if (!rl.ok) {
+    const min = Math.ceil(rl.retryAfterMs / 60_000);
+    return NextResponse.json(
+      { error: `Muitas tentativas. Tente novamente em ${min} min.` },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } },
+    );
+  }
 
   const user = await prisma.user.findUnique({ where: { username: uname } });
   if (!user || !user.active) {

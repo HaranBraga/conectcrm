@@ -1,6 +1,14 @@
 import { jwtVerify, SignJWT } from "jose";
 
-const SECRET = new TextEncoder().encode(process.env.AUTH_SECRET || "dev-secret-change-me-in-production");
+const RAW_SECRET = process.env.AUTH_SECRET;
+if (process.env.NODE_ENV === "production" && (!RAW_SECRET || RAW_SECRET.length < 32)) {
+  throw new Error(
+    "AUTH_SECRET não está configurada (ou é muito curta). Em produção, defina " +
+    "uma string aleatória de pelo menos 32 caracteres na variável AUTH_SECRET. " +
+    "Gere uma com: openssl rand -hex 32"
+  );
+}
+const SECRET = new TextEncoder().encode(RAW_SECRET || "dev-secret-change-me-in-production");
 
 export const SESSION_COOKIE = "session";
 

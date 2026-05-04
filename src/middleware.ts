@@ -7,8 +7,7 @@ const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/auth/me",
   "/api/auth/logout",
-  "/api/webhook",          // webhook do WhatsApp/Evolution
-  "/api/sse",              // server-sent events (já valida internamente se quiser)
+  "/api/webhook",          // webhook do WhatsApp/Evolution (ver WEBHOOK_TOKEN)
 ];
 
 function isPublic(path: string): boolean {

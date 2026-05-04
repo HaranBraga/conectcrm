@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
+
+export const runtime = "nodejs";
 
 export async function POST() {
+  const u = await getCurrentUser();
+  if (!u) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  if (!u.isAdmin) return NextResponse.json({ error: "Apenas admin" }, { status: 403 });
+
   const existing = await prisma.kanbanStatus.count();
   if (existing > 0) return NextResponse.json({ message: "Já inicializado" });
 
