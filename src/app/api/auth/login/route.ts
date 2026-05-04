@@ -7,47 +7,58 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const { username, password } = await req.json();
-  if (!username || !password) {
-    return NextResponse.json({ error: "Usuário e senha obrigatórios" }, { status: 400 });
-  }
+  try {
+    const { username, password } = await req.json();
+    if (!username || !password) {
+      return NextResponse.json({ error: "Usuário e senha obrigatórios" }, { status: 400 });
+    }
 
-  const uname = String(username).toLowerCase().trim();
+    const uname = String(username).toLowerCase().trim();
 
-  // Rate limit: 8 tentativas por IP+username em 15 min
-  const ip = getClientIp(req);
-  const rl = checkRateLimit(`login:${ip}:${uname}`, { limit: 8, windowMs: 15 * 60_000 });
-  if (!rl.ok) {
-    const min = Math.ceil(rl.retryAfterMs / 60_000);
+    // Rate limit: 8 tentativas por IP+username em 15 min
+    const ip = getClientIp(req);
+    const rl = checkRateLimit(`login:${ip}:${uname}`, { limit: 8, windowMs: 15 * 60_000 });
+    if (!rl.ok) {
+      const min = Math.ceil(rl.retryAfterMs / 60_000);
+      return NextResponse.json(
+        { error: `Muitas tentativas. Tente novamente em ${min} min.` },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } },
+      );
+    }
+
+    const user = await prisma.user.findUnique({ where: { username: uname } });
+    if (!user || !user.active) {
+      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
+    }
+
+    const ok = await verifyPassword(password, user.password);
+    if (!ok) {
+      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
+    }
+
+    await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
+
+    const token = await signSession({ uid: user.id, isAdmin: user.isAdmin });
+
+    const res = NextResponse.json({
+      user: { id: user.id, name: user.name, username: user.username, isAdmin: user.isAdmin, modules: user.modules },
+    });
+    res.cookies.set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30, // 30 dias
+    });
+    return res;
+  } catch (err: any) {
+    console.error("[login] erro:", err);
+    const msg = err?.message ?? "Erro interno";
+    // Mensagens "AUTH_SECRET não está configurada..." são informativas e seguras de mostrar
+    const isConfigError = typeof msg === "string" && msg.includes("AUTH_SECRET");
     return NextResponse.json(
-      { error: `Muitas tentativas. Tente novamente em ${min} min.` },
-      { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } },
+      { error: isConfigError ? msg : "Erro interno no servidor de autenticação. Verifique os logs." },
+      { status: 500 },
     );
   }
-
-  const user = await prisma.user.findUnique({ where: { username: uname } });
-  if (!user || !user.active) {
-    return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
-  }
-
-  const ok = await verifyPassword(password, user.password);
-  if (!ok) {
-    return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
-  }
-
-  await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
-
-  const token = await signSession({ uid: user.id, isAdmin: user.isAdmin });
-
-  const res = NextResponse.json({
-    user: { id: user.id, name: user.name, username: user.username, isAdmin: user.isAdmin, modules: user.modules },
-  });
-  res.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30, // 30 dias
-  });
-  return res;
 }
