@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, Calendar, MapPin, Users, Home as HomeIcon, UserCheck, Send,
-  Save, Trash2, Tag, MessageSquare, X, AlertCircle,
+  Save, Trash2, Tag, MessageSquare, X, AlertCircle, ChevronDown, ChevronUp,
+  Image as ImageIcon, Link2, Plus, Settings,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { format } from "date-fns";
@@ -153,7 +154,7 @@ function SendOneModal({ cc, campaign, onClose, onSent }: any) {
 
 // ─── Linha de contato ────────────────────────────────────────────────────────
 
-function ContactRow({ cc, campaign, tags, onSend, onPatch, onDelete }: any) {
+function ContactRow({ cc, tags, onSend, onPatch, onDelete }: any) {
   const router = useRouter();
   const [showTags, setShowTags] = useState(false);
   const tagRef = useRef<HTMLDivElement>(null);
@@ -224,6 +225,187 @@ function ContactRow({ cc, campaign, tags, onSend, onPatch, onDelete }: any) {
 
 // ─── Painel da aba ativa ─────────────────────────────────────────────────────
 
+function ParticipantsList({ items, label }: { items: any[]; label: string }) {
+  return (
+    <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+      <div className="px-3 py-2 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase flex items-center justify-between">
+        <span>{label}</span>
+        <span className="text-gray-400">{items.length}</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-center text-gray-400 text-xs py-4">Nenhum participante</p>
+      ) : (
+        <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
+          {items.map((p: any, i: number) => {
+            const name  = p.contact?.name ?? p.nome ?? "(sem nome)";
+            const phone = p.contact?.phone ?? p.telefone ?? "";
+            const initial = (name?.[0] ?? "?").toUpperCase();
+            return (
+              <div key={p.id ?? p.contactId ?? i} className="flex items-center gap-2 px-3 py-2">
+                <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-semibold shrink-0">{initial}</span>
+                <span className="text-xs text-gray-800 flex-1 truncate">{name}</span>
+                <span className="text-[10px] text-gray-400 shrink-0">{phone}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdvancedConfig({ campaign, onChange }: { campaign: any; onChange: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState(campaign.status);
+  const [mediaUrl, setMediaUrl] = useState<string | null>(campaign.mediaUrl);
+  const [mediaType, setMediaType] = useState<string | null>(campaign.mediaType);
+  const [linkUrl, setLinkUrl] = useState(campaign.linkUrl ?? "");
+  const [tags, setTags] = useState<any[]>(campaign.responseTags ?? []);
+  const [newTag, setNewTag] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setStatus(campaign.status);
+    setMediaUrl(campaign.mediaUrl);
+    setMediaType(campaign.mediaType);
+    setLinkUrl(campaign.linkUrl ?? "");
+    setTags(campaign.responseTags ?? []);
+  }, [campaign.id, campaign.status, campaign.mediaUrl, campaign.mediaType, campaign.linkUrl, campaign.responseTags]);
+
+  async function uploadMedia(file: File) {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch("/api/campaigns/upload", { method: "POST", body: fd });
+      if (!r.ok) { const d = await r.json(); toast.error(d.error ?? "Erro"); return; }
+      const d = await r.json();
+      setMediaUrl(d.url); setMediaType(d.type);
+      toast.success("Mídia carregada");
+    } finally { setUploading(false); }
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const r = await fetch(`/api/campaigns/${campaign.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, mediaUrl, mediaType, linkUrl: linkUrl || null }),
+      });
+      if (!r.ok) { toast.error("Erro ao salvar"); return; }
+      toast.success("Configurações salvas");
+      onChange();
+    } finally { setSaving(false); }
+  }
+
+  async function addTag() {
+    if (!newTag.trim()) return;
+    const r = await fetch(`/api/campaigns/${campaign.id}/tags`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label: newTag }),
+    });
+    if (!r.ok) { toast.error("Erro"); return; }
+    const t = await r.json();
+    setTags(prev => [...prev, t]);
+    setNewTag("");
+    onChange();
+  }
+
+  async function delTag(id: string) {
+    await fetch(`/api/campaigns/${campaign.id}/tags/${id}`, { method: "DELETE" });
+    setTags(prev => prev.filter(t => t.id !== id));
+    onChange();
+  }
+
+  return (
+    <section className="bg-white border border-gray-200 rounded-xl">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+        <span className="flex items-center gap-2"><Settings size={14} /> Configurações avançadas</span>
+        {open ? <ChevronUp size={15} className="text-gray-400" /> : <ChevronDown size={15} className="text-gray-400" />}
+      </button>
+      {open && (
+        <div className="px-4 pb-4 flex flex-col gap-4">
+          {/* Status */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1.5">Status</p>
+            <div className="flex gap-1.5">
+              {(["ATIVA", "PAUSADA", "CONCLUIDA"] as const).map(s => (
+                <button key={s} type="button" onClick={() => setStatus(s)}
+                  className={`text-xs px-3 py-1 rounded-full border font-medium ${status === s ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
+                  {s === "ATIVA" ? "Ativa" : s === "PAUSADA" ? "Pausada" : "Concluída"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Mídia */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1.5 flex items-center gap-1.5"><ImageIcon size={12} /> Mídia (opcional)</p>
+            {mediaUrl ? (
+              <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-2">
+                {mediaType === "video"
+                  ? <video src={mediaUrl} className="w-20 h-20 rounded-lg object-cover" controls />
+                  : <img src={mediaUrl} alt="" className="w-20 h-20 rounded-lg object-cover" />}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] text-gray-500 truncate">{mediaUrl}</p>
+                  <button onClick={() => { setMediaUrl(null); setMediaType(null); }}
+                    className="text-xs text-red-500 hover:underline mt-1">Remover</button>
+                </div>
+              </div>
+            ) : (
+              <label className="flex items-center justify-center gap-2 px-3 py-2.5 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer text-xs text-gray-500 hover:bg-gray-50">
+                <input type="file" accept="image/*,video/*" className="hidden"
+                  onChange={e => e.target.files?.[0] && uploadMedia(e.target.files[0])} />
+                {uploading ? "Enviando..." : "Carregar imagem ou vídeo (até 25MB)"}
+              </label>
+            )}
+          </div>
+
+          {/* Link */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1.5 flex items-center gap-1.5"><Link2 size={12} /> Link com prévia (opcional)</p>
+            <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="https://..."
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+          </div>
+
+          {/* Tags */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1.5 flex items-center gap-1.5"><Tag size={12} /> Tags de resposta</p>
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {tags.map(t => (
+                  <div key={t.id} className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border"
+                    style={{ color: t.color, backgroundColor: t.bgColor, borderColor: t.color + "40" }}>
+                    {t.label}
+                    <button onClick={() => delTag(t.id)} className="opacity-50 hover:opacity-100"><X size={10} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input value={newTag} onChange={e => setNewTag(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addTag())} placeholder="Nova tag..."
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs" />
+              <button onClick={addTag} className="bg-brand-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium">
+                <Plus size={13} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2 border-t border-gray-100">
+            <button onClick={save} disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white rounded-lg text-xs font-medium">
+              <Save size={12} /> {saving ? "Salvando..." : "Salvar configurações"}
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ModeTab({ reuniao, mode, campaign, onCampaignCreated, onChange }: {
   reuniao: any; mode: Mode; campaign: any | null;
   onCampaignCreated: () => void; onChange: () => void;
@@ -257,6 +439,29 @@ function ModeTab({ reuniao, mode, campaign, onCampaignCreated, onChange }: {
     return () => es.close();
   }, [loadContacts, onChange]);
 
+  // ─── HOOKS DERIVADOS — todos antes de qualquer return ──────────────────
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const cc of contacts) c[cc.status] = (c[cc.status] ?? 0) + 1;
+    return c;
+  }, [contacts]);
+
+  const sorted = useMemo(() => [...contacts].sort((a, b) => {
+    if (a.status === "PENDENTE" && b.status !== "PENDENTE") return -1;
+    if (a.status !== "PENDENTE" && b.status === "PENDENTE") return 1;
+    return new Date(b.sentAt ?? b.addedAt).getTime() - new Date(a.sentAt ?? a.addedAt).getTime();
+  }), [contacts]);
+
+  const previewParticipants = useMemo(() => {
+    if (mode === "anfitrioes") return reuniao.anfitrioes ?? [];
+    const anfSet = new Set((reuniao.anfitrioes ?? []).map((a: any) => a.contactId));
+    if (mode === "presentes") {
+      return (reuniao.presentes ?? []).filter((p: any) => p.contactId && !anfSet.has(p.contactId));
+    }
+    return (reuniao.presentes ?? []).filter((p: any) => p.contactId);
+  }, [reuniao, mode]);
+
+  // ─── Handlers ──────────────────────────────────────────────────────────
   async function startDispatch() {
     setCreating(true);
     try {
@@ -288,7 +493,7 @@ function ModeTab({ reuniao, mode, campaign, onCampaignCreated, onChange }: {
   function insertVar(key: string) {
     const placeholder = `{{${key}}}`;
     const ta = taRef.current;
-    if (!ta) { setTemplate(prev => prev + placeholder); return; }
+    if (!ta) { setTemplate((prev: string) => prev + placeholder); return; }
     const start = ta.selectionStart ?? template.length;
     const end   = ta.selectionEnd ?? template.length;
     const next = template.slice(0, start) + placeholder + template.slice(end);
@@ -325,33 +530,27 @@ function ModeTab({ reuniao, mode, campaign, onCampaignCreated, onChange }: {
 
   // Empty state — disparo ainda não criado para esse modo
   if (!campaign) {
-    const total =
-      mode === "anfitrioes" ? (reuniao.anfitrioes?.length ?? 0)
-      : mode === "presentes"  ? Math.max(0, (reuniao._count?.presentes ?? 0) - (reuniao.anfitrioes?.length ?? 0))
-      :                         (reuniao._count?.presentes ?? 0);
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
-        <div className="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center mb-3">
-          <Send size={20} className="text-brand-600" />
+      <div className="max-w-3xl mx-auto flex flex-col gap-4">
+        <div className="bg-white border border-gray-200 rounded-xl py-10 px-6 flex flex-col items-center text-center">
+          <div className="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center mb-3">
+            <Send size={20} className="text-brand-600" />
+          </div>
+          <h3 className="text-base font-semibold text-gray-900 mb-1">Disparo ainda não iniciado</h3>
+          <p className="text-sm text-gray-500 mb-4">{previewParticipants.length} contato(s) disponíveis para esta categoria.</p>
+          <button onClick={startDispatch} disabled={creating || previewParticipants.length === 0}
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            <Send size={14} /> {creating ? "Criando..." : "Iniciar disparo"}
+          </button>
+          <p className="text-[11px] text-gray-400 mt-3">Após iniciar, você poderá configurar mensagem, mídia, link e etiquetas.</p>
         </div>
-        <h3 className="text-base font-semibold text-gray-900 mb-1">Disparo ainda não iniciado</h3>
-        <p className="text-sm text-gray-500 mb-4">{total} contato(s) disponíveis para esta categoria.</p>
-        <button onClick={startDispatch} disabled={creating || total === 0}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          <Send size={14} /> {creating ? "Criando..." : "Iniciar disparo"}
-        </button>
+
+        <ParticipantsList items={previewParticipants} label="Participantes desta categoria" />
       </div>
     );
   }
 
-  const counts = useCounts(contacts);
-  const pendentes = counts.PENDENTE;
-  const processados = (counts.ENVIADO ?? 0) + (counts.RESPONDEU ?? 0) + (counts.IGNOROU ?? 0) + (counts.FALHOU ?? 0);
-  const sorted = useMemo(() => [...contacts].sort((a, b) => {
-    if (a.status === "PENDENTE" && b.status !== "PENDENTE") return -1;
-    if (a.status !== "PENDENTE" && b.status === "PENDENTE") return 1;
-    return new Date(b.sentAt ?? b.addedAt).getTime() - new Date(a.sentAt ?? a.addedAt).getTime();
-  }), [contacts]);
+  const pendentes = counts.PENDENTE ?? 0;
 
   return (
     <div className="flex flex-col gap-5 max-w-3xl mx-auto">
@@ -432,28 +631,23 @@ function ModeTab({ reuniao, mode, campaign, onCampaignCreated, onChange }: {
         ) : (
           <div className="divide-y divide-gray-100">
             {contactsTotal > contacts.length && (
-              <p className="px-4 py-2 text-[11px] text-amber-700 bg-amber-50">Mostrando {contacts.length} de {contactsTotal} — use os filtros futuros pra ver mais</p>
+              <p className="px-4 py-2 text-[11px] text-amber-700 bg-amber-50">Mostrando {contacts.length} de {contactsTotal}</p>
             )}
             {sorted.map(cc => (
-              <ContactRow key={cc.id} cc={cc} campaign={campaign} tags={campaign.responseTags ?? []}
+              <ContactRow key={cc.id} cc={cc} tags={campaign.responseTags ?? []}
                 onSend={setSendCc} onPatch={patchContact} onDelete={deleteContact} />
             ))}
           </div>
         )}
       </section>
 
+      {/* Configurações avançadas (mídia, link, status, tags) */}
+      <AdvancedConfig campaign={campaign} onChange={onChange} />
+
       {batchOpen && <BatchModal campaign={campaign} totalPendentes={pendentes} onClose={() => setBatchOpen(false)} onStarted={() => { loadContacts(); onChange(); }} />}
       {sendCc && <SendOneModal cc={sendCc} campaign={campaign} onClose={() => setSendCc(null)} onSent={() => { loadContacts(); onChange(); }} />}
     </div>
   );
-}
-
-function useCounts(contacts: any[]): Record<string, number> {
-  return useMemo(() => {
-    const c: Record<string, number> = {};
-    for (const cc of contacts) c[cc.status] = (c[cc.status] ?? 0) + 1;
-    return c;
-  }, [contacts]);
 }
 
 // ─── Página principal ───────────────────────────────────────────────────────
