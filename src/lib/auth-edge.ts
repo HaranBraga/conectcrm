@@ -1,16 +1,24 @@
 import { jwtVerify, SignJWT } from "jose";
 
-const RAW_SECRET = process.env.AUTH_SECRET;
-if (process.env.NODE_ENV === "production" && (!RAW_SECRET || RAW_SECRET.length < 32)) {
-  throw new Error(
-    "AUTH_SECRET não está configurada (ou é muito curta). Em produção, defina " +
-    "uma string aleatória de pelo menos 32 caracteres na variável AUTH_SECRET. " +
-    "Gere uma com: openssl rand -hex 32"
-  );
-}
-const SECRET = new TextEncoder().encode(RAW_SECRET || "dev-secret-change-me-in-production");
-
 export const SESSION_COOKIE = "session";
+
+/**
+ * Resolve o secret em runtime (não no top-level do módulo).
+ * Em build (`next build`) Next chega a importar este arquivo para
+ * coletar dados das páginas; o throw aqui não pode rodar nesse momento.
+ * Por isso a checagem fica nas funções abaixo, executadas só em runtime.
+ */
+function getSecret(): Uint8Array {
+  const raw = process.env.AUTH_getSecret();
+  if (process.env.NODE_ENV === "production" && (!raw || raw.length < 32)) {
+    throw new Error(
+      "AUTH_getSecret() não está configurada (ou é muito curta). Em produção, defina " +
+      "uma string aleatória de pelo menos 32 caracteres na variável AUTH_getSecret(). " +
+      "Gere uma com: openssl rand -hex 32"
+    );
+  }
+  return new TextEncoder().encode(raw || "dev-secret-change-me-in-production");
+}
 
 export type SessionPayload = { uid: string; isAdmin: boolean };
 
@@ -20,13 +28,13 @@ export async function signSession(payload: SessionPayload): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
-    .sign(SECRET);
+    .sign(getSecret());
 }
 
 /** Verifica e retorna payload, ou null se inválido. */
 export async function verifySession(token: string): Promise<SessionPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getSecret());
     return payload as unknown as SessionPayload;
   } catch {
     return null;
