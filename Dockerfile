@@ -24,5 +24,11 @@ COPY --from=builder /app/scripts ./scripts
 
 EXPOSE 3000
 
-# Sincroniza schema, seed inicial e inicia
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node scripts/startup.js && npm start"]
+# Sincroniza schema, seed inicial e inicia.
+#
+# ATENÇÃO: NÃO use --accept-data-loss aqui. Essa flag autoriza o Prisma a
+# DELETAR colunas e tabelas silenciosamente quando o schema diverge — foi
+# causa de perda de dados em deploys anteriores. Sem ela, se o schema
+# requer perda de dados, o deploy FALHA e você decide manualmente
+# (backup + migration explícita).
+CMD ["sh", "-c", "npx prisma db push && node scripts/startup.js && npm start"]
