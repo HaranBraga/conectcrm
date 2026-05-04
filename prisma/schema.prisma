@@ -1,3 +1,13 @@
+// ATENÇÃO: este schema é COMPARTILHADO com o projeto `painel-360` (banco
+// Postgres único). Toda mudança aqui PRECISA ser refletida no schema do
+// painel-360, senão o `prisma db push` de um app vai detectar tabelas
+// "estranhas" e falhar.
+//
+// Regras pra evitar perda de dados:
+// 1. NUNCA usar --accept-data-loss em produção.
+// 2. Adicionar novos models nos DOIS projetos antes de qualquer deploy.
+// 3. Remoção de campos: fazer com migration e backup.
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -77,6 +87,9 @@ model Contact {
   campaigns         CampaignContact[]  @relation("CampaignTargetContact")
   campaignsAssigned CampaignContact[]  @relation("CampaignAssignedTo")
   campaignsSent     CampaignContact[]  @relation("CampaignSentBy")
+
+  customFields    Json?                                // valores dos campos personalizados (usado no Painel 360)
+  contactNotes    ContactNote[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -187,6 +200,8 @@ model User {
   lastLogin DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
+  contactNotes ContactNote[]
 
   @@index([username])
 }
@@ -410,4 +425,35 @@ model CampaignResponseTag {
   contacts   CampaignContact[]
 
   @@index([campaignId])
+}
+
+// ─── Anotações e campos personalizados (usado no Painel 360) ───────────────────
+// Tabelas presentes neste schema apenas pra Prisma reconhecê-las e não tentar
+// dropar no `db push`. A UI/CRUD dessas entidades vive no projeto painel-360.
+
+model ContactNote {
+  id        String   @id @default(cuid())
+  contactId String
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  body      String
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([contactId])
+  @@index([createdAt])
+}
+
+model ContactCustomField {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String
+  type      String   @default("text")
+  options   String[] @default([])
+  required  Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([position])
 }
