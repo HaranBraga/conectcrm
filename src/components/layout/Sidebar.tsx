@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, Megaphone, Settings, Zap, MessageSquare,
-  ClipboardList, CalendarDays, UsersRound, LogOut, BarChart3,
+  ClipboardList, CalendarDays, UsersRound, LogOut,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -15,7 +15,6 @@ const ICONS: Record<string, any> = {
   reunioes:  UsersRound,
   contatos:  Users,
   campanhas: Megaphone,
-  relatorios: BarChart3,
 };
 
 const NAV = [
@@ -26,7 +25,6 @@ const NAV = [
   { module: "reunioes",  href: "/reunioes",  label: "Reuniões" },
   { module: "contatos",  href: "/contatos",  label: "Contatos" },
   { module: "campanhas", href: "/campanhas", label: "Campanhas" },
-  { module: "relatorios", href: "/relatorios", label: "Relatórios" },
 ];
 
 type User = { id: string; name: string; username?: string | null; isAdmin: boolean; modules: string[] };

@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import Link from "next/link";
-import { Plus, Search, Clock, Phone, ChevronRight, Edit2, Filter, X } from "lucide-react";
+import { Plus, Search, Clock, Phone, ChevronRight, Edit2 } from "lucide-react";
 import { RoleBadge, type PersonRole } from "@/components/ui/RoleBadge";
 import { Modal } from "@/components/ui/Modal";
 import { formatDistanceToNow } from "date-fns";
@@ -15,48 +14,6 @@ interface Contact {
   dataNascimento?: string; genero?: string;
   rua?: string; bairro?: string; cidade?: string; zona?: string;
   _count?: { children: number };
-}
-
-function FilterPicker({ label, options, selected, onChange, placeholder }: {
-  label: string;
-  options: { value: string; label: string; count?: number }[];
-  selected: string[];
-  onChange: (next: string[]) => void;
-  placeholder?: string;
-}) {
-  const [q, setQ] = useState("");
-  const filtered = options.filter(o => !q.trim() || o.label.toLowerCase().includes(q.toLowerCase()));
-  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(s => s !== v) : [...selected, v]);
-
-  return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 bg-gray-50">
-        <span className="text-[11px] font-semibold text-gray-600 uppercase">{label}</span>
-        {selected.length > 0 && (
-          <button onClick={() => onChange([])} className="ml-auto text-[10px] text-red-400 hover:text-red-600">limpar ({selected.length})</button>
-        )}
-      </div>
-      {options.length > 8 && (
-        <div className="px-2 py-1.5 border-b border-gray-100">
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder={placeholder ?? "Filtrar..."}
-            className="w-full text-xs px-2 py-1 bg-transparent focus:outline-none" />
-        </div>
-      )}
-      <div className="max-h-44 overflow-y-auto">
-        {filtered.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">Nada</p>}
-        {filtered.slice(0, 200).map(o => {
-          const on = selected.includes(o.value);
-          return (
-            <label key={o.value} className="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-50">
-              <input type="checkbox" checked={on} onChange={() => toggle(o.value)} className="rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-              <span className="flex-1 text-gray-700 truncate">{o.label}</span>
-              {o.count !== undefined && <span className="text-[10px] text-gray-400">{o.count}</span>}
-            </label>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 function withBR(phone: string) {
@@ -203,16 +160,8 @@ function ContactForm({ initial, onSave, onClose, contacts, roles }: {
 export default function ContatosPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [roles, setRoles]       = useState<PersonRole[]>([]);
-  const [opts, setOpts]         = useState<any | null>(null);
-  const [labelDefs, setLabelDefs] = useState<any[]>([]);
-  const [leaders, setLeaders]   = useState<any[]>([]);
   const [search, setSearch]     = useState("");
-  const [roleKeys, setRoleKeys] = useState<string[]>([]);
-  const [cidades,  setCidades]  = useState<string[]>([]);
-  const [bairros,  setBairros]  = useState<string[]>([]);
-  const [labelsFilter, setLabelsFilter] = useState<string[]>([]);
-  const [liderIds, setLiderIds] = useState<string[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
+  const [roleFilter, setRoleFilter] = useState("");
   const [total, setTotal]       = useState(0);
   const [page, setPage]         = useState(1);
   const [pages, setPages]       = useState(1);
@@ -225,50 +174,29 @@ export default function ContatosPage() {
     setRoles(await r.json());
   }, []);
 
-  const load = useCallback(async (p = 1) => {
+  const load = useCallback(async (p = 1, q = search, r = roleFilter) => {
     const params = new URLSearchParams({ page: String(p), limit: "50" });
-    if (search) params.set("search", search);
-    if (roleKeys.length) params.set("roleKeys", roleKeys.join(","));
-    if (cidades.length)  params.set("cidades", cidades.join(","));
-    if (bairros.length)  params.set("bairros", bairros.join(","));
-    if (labelsFilter.length) params.set("labels", labelsFilter.join(","));
-    if (liderIds.length) params.set("liderIds", liderIds.join(","));
+    if (q) params.set("search", q);
+    if (r) params.set("roleId", r);
     const res = await fetch(`/api/contacts?${params}`);
     const data = await res.json();
     setContacts(data.contacts ?? []);
     setTotal(data.total ?? 0);
     setPage(data.page ?? 1);
     setPages(data.pages ?? 1);
-  }, [search, roleKeys, cidades, bairros, labelsFilter, liderIds]);
+  }, [search, roleFilter]);
 
-  useEffect(() => { loadRoles(); }, [loadRoles]);
+  useEffect(() => { loadRoles(); load(); }, [loadRoles]);
 
-  // Carrega opções de filtro
-  useEffect(() => {
-    fetch("/api/contacts/filter-options").then(r => r.json()).then(setOpts);
-    fetch("/api/labels").then(r => r.json()).then(setLabelDefs);
-  }, []);
-
-  // Recarrega quando qualquer filtro muda (debounced no search)
-  useEffect(() => {
+  function onSearch(v: string) {
+    setSearch(v);
     clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => load(1), 250);
-    return () => clearTimeout(debounceRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, roleKeys, cidades, bairros, labelsFilter, liderIds]);
-
-  // Carrega líderes ao abrir filtros
-  useEffect(() => {
-    if (showFilters && leaders.length === 0) {
-      fetch("/api/contacts/leaders?limit=200").then(r => r.json()).then(setLeaders);
-    }
-  }, [showFilters, leaders.length]);
-
-  const activeFilterCount = roleKeys.length + cidades.length + bairros.length + labelsFilter.length + liderIds.length;
-  function clearAll() {
-    setRoleKeys([]); setCidades([]); setBairros([]); setLabelsFilter([]); setLiderIds([]);
+    debounceRef.current = setTimeout(() => load(1, v, roleFilter), 400);
   }
-  function toggle<T>(arr: T[], v: T): T[] { return arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]; }
+  function onRoleFilter(v: string) {
+    setRoleFilter(v);
+    load(1, search, v);
+  }
 
 
   const grouped = roles.reduce<Record<string, Contact[]>>((acc, role) => {
@@ -288,38 +216,15 @@ export default function ContatosPage() {
         </button>
       </header>
 
-      <div className="bg-white border-b border-gray-100">
-        <div className="flex items-center gap-3 px-6 py-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar nome ou telefone..." className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-          </div>
-          <button onClick={() => setShowFilters(s => !s)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${activeFilterCount > 0 ? "bg-brand-50 border-brand-300 text-brand-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
-            <Filter size={14} /> Filtros
-            {activeFilterCount > 0 && <span className="bg-brand-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{activeFilterCount}</span>}
-          </button>
-          {activeFilterCount > 0 && (
-            <button onClick={clearAll} className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1">
-              <X size={12} /> Limpar
-            </button>
-          )}
+      <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-100">
+        <div className="relative flex-1 max-w-sm">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input value={search} onChange={(e) => onSearch(e.target.value)} placeholder="Buscar nome ou telefone..." className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
         </div>
-
-        {showFilters && (
-          <div className="px-6 pb-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 border-t border-gray-100 pt-4">
-            <FilterPicker label="Papéis" options={(opts?.roles ?? []).map((r: any) => ({ value: r.key, label: r.label, count: r.count }))}
-              selected={roleKeys} onChange={setRoleKeys} />
-            <FilterPicker label="Líderes (rede direta)" options={leaders.map((l: any) => ({ value: l.id, label: l.name, count: l.childCount }))}
-              selected={liderIds} onChange={setLiderIds} placeholder="Buscar líder..." />
-            <FilterPicker label="Cidades" options={(opts?.cidades ?? []).map((c: any) => ({ value: c.value, label: c.value, count: c.count }))}
-              selected={cidades} onChange={setCidades} />
-            <FilterPicker label="Bairros" options={(opts?.bairros ?? []).map((b: any) => ({ value: b.value, label: b.value, count: b.count }))}
-              selected={bairros} onChange={setBairros} />
-            <FilterPicker label="Etiquetas" options={labelDefs.map((l: any) => ({ value: l.name, label: l.name }))}
-              selected={labelsFilter} onChange={setLabelsFilter} />
-          </div>
-        )}
+        <select value={roleFilter} onChange={(e) => onRoleFilter(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">Todos os cargos</option>
+          {roles.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+        </select>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
@@ -335,27 +240,25 @@ export default function ContatosPage() {
               <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
                 {group.map((c) => (
                   <div key={c.id} className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 group">
-                    <Link href={`/contatos/${c.id}`} className="flex items-center gap-4 flex-1 min-w-0">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0" style={{ backgroundColor: c.role.bgColor, color: c.role.color }}>
-                        {c.name[0].toUpperCase()}
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0" style={{ backgroundColor: c.role.bgColor, color: c.role.color }}>
+                      {c.name[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-gray-900 text-sm">{c.name}</p>
+                        {c.parent && <span className="text-xs text-gray-400 flex items-center gap-0.5"><ChevronRight size={10} />{c.parent.name}</span>}
+                        {c.cidade && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{c.cidade}</span>}
+                        {c.zona   && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{c.zona}</span>}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium text-gray-900 text-sm">{c.name}</p>
-                          {c.parent && <span className="text-xs text-gray-400 flex items-center gap-0.5"><ChevronRight size={10} />{c.parent.name}</span>}
-                          {c.cidade && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{c.cidade}</span>}
-                          {c.zona   && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{c.zona}</span>}
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
-                          <span className="flex items-center gap-1"><Phone size={10} />{stripBR(c.phone)}</span>
-                          {c.lastContactAt && (
-                            <span className="flex items-center gap-1 text-gray-400"><Clock size={10} />
-                              {formatDistanceToNow(new Date(c.lastContactAt), { locale: ptBR, addSuffix: true })}
-                            </span>
-                          )}
-                        </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
+                        <span className="flex items-center gap-1"><Phone size={10} />{stripBR(c.phone)}</span>
+                        {c.lastContactAt && (
+                          <span className="flex items-center gap-1 text-gray-400"><Clock size={10} />
+                            {formatDistanceToNow(new Date(c.lastContactAt), { locale: ptBR, addSuffix: true })}
+                          </span>
+                        )}
                       </div>
-                    </Link>
+                    </div>
                     {/* Kanban status */}
                     {(() => {
                       const conv = (c as any).conversations?.[0];

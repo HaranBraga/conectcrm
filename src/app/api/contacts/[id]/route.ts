@@ -19,7 +19,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  const { name, phone, email, roleId, parentId, notes, lastContactAt, lastMessage, dataNascimento, genero, rua, bairro, cidade, zona, labels, customFields } = body;
+  const { name, phone, email, roleId, parentId, notes, lastContactAt, lastMessage, dataNascimento, genero, rua, bairro, cidade, zona } = body;
 
   const contact = await prisma.contact.update({
     where: { id: params.id },
@@ -37,8 +37,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       ...(bairro    !== undefined && { bairro }),
       ...(cidade    !== undefined && { cidade }),
       ...(zona      !== undefined && { zona }),
-      ...(labels    !== undefined && { labels: Array.isArray(labels) ? labels : [] }),
-      ...(customFields !== undefined && { customFields: customFields && typeof customFields === "object" ? customFields : null }),
       ...(dataNascimento !== undefined && {
         dataNascimento: dataNascimento ? new Date(dataNascimento) : null,
       }),
