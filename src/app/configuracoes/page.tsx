@@ -284,6 +284,7 @@ const TABS = [
   { key: "demandas",    label: "Demandas",     icon: ClipboardList },
   { key: "etiquetas",   label: "Etiquetas",    icon: Tags        },
   { key: "calendarios", label: "Calendários",  icon: Calendar    },
+  { key: "campos",      label: "Campos personalizados", icon: KeyRound },
   { key: "usuarios",    label: "Usuários",     icon: UsersIcon   },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
@@ -298,6 +299,7 @@ export default function ConfiguracoesPage() {
   const [calendarios, setCalendarios] = useState<any[]>([]);
   const [demandaCfg, setDemandaCfg]   = useState<any>({ statuses: [], prioridades: [], segmentos: [] });
   const [users, setUsers]             = useState<any[]>([]);
+  const [customFields, setCustomFields] = useState<any[]>([]);
 
   const [modal, setModal] = useState<string | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
@@ -308,9 +310,10 @@ export default function ConfiguracoesPage() {
   const loadCalendarios = useCallback(async () => setCalendarios(await (await fetch("/api/agenda/calendarios")).json()), []);
   const loadDemandaCfg  = useCallback(async () => setDemandaCfg(await (await fetch("/api/demandas/config")).json()), []);
   const loadUsers       = useCallback(async () => setUsers(await (await fetch("/api/users")).json()), []);
+  const loadCustomFields = useCallback(async () => setCustomFields(await (await fetch("/api/custom-fields")).json()), []);
 
-  useEffect(() => { loadStatuses(); loadRoles(); loadLabels(); loadCalendarios(); loadDemandaCfg(); loadUsers(); },
-    [loadStatuses, loadRoles, loadLabels, loadCalendarios, loadDemandaCfg, loadUsers]);
+  useEffect(() => { loadStatuses(); loadRoles(); loadLabels(); loadCalendarios(); loadDemandaCfg(); loadUsers(); loadCustomFields(); },
+    [loadStatuses, loadRoles, loadLabels, loadCalendarios, loadDemandaCfg, loadUsers, loadCustomFields]);
 
   async function saveDemandaCfg(patch: any) {
     const updated = { ...demandaCfg, ...patch };
@@ -454,6 +457,10 @@ export default function ConfiguracoesPage() {
                   ))}
                 </div>
               </section>
+            )}
+
+            {tab === "campos" && (
+              <CamposPersonalizadosSection fields={customFields} onChange={loadCustomFields} />
             )}
 
             {tab === "usuarios" && (
@@ -643,5 +650,161 @@ function StringListEditor({ items, placeholder, onChange }: { items: string[]; p
         <button onClick={() => { if (newItem.trim()) { onChange([...items, newItem.trim()]); setNewItem(""); } }} className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white px-3 py-2 rounded-lg text-sm font-medium"><Plus size={14} /> Adicionar</button>
       </div>
     </>
+  );
+}
+
+// ─── Campos Personalizados (contatos) ────────────────────────────────────────
+
+const FIELD_TYPES = [
+  { key: "text",    label: "Texto" },
+  { key: "number",  label: "Número" },
+  { key: "date",    label: "Data" },
+  { key: "boolean", label: "Sim / Não" },
+  { key: "select",  label: "Lista (escolha)" },
+];
+
+function CamposPersonalizadosSection({ fields, onChange }: { fields: any[]; onChange: () => void }) {
+  const [adding, setAdding] = useState(false);
+  const [edit, setEdit] = useState<string | null>(null);
+
+  return (
+    <section>
+      <SectionHeader title="Campos personalizados" description="Adicione campos customizados ao cadastro de contatos. Aparecem na ficha e no formulário."
+        action={<button onClick={() => setAdding(true)} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-3 py-2 rounded-lg text-sm font-medium"><Plus size={14} /> Novo campo</button>} />
+
+      <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+        {fields.length === 0 && !adding && <p className="py-10 text-center text-gray-400 text-sm">Nenhum campo personalizado</p>}
+
+        {adding && (
+          <CampoForm onCancel={() => setAdding(false)} onSaved={() => { setAdding(false); onChange(); }} />
+        )}
+
+        {fields.map(f => (
+          edit === f.id ? (
+            <CampoForm key={f.id} initial={f} onCancel={() => setEdit(null)} onSaved={() => { setEdit(null); onChange(); }} />
+          ) : (
+            <div key={f.id} className="flex items-center gap-4 px-4 py-3 group">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-gray-800">{f.label}</p>
+                  <code className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{f.key}</code>
+                  <span className="text-[10px] text-gray-400">{FIELD_TYPES.find(t => t.key === f.type)?.label ?? f.type}</span>
+                  {f.required && <span className="text-[10px] text-red-500">obrigatório</span>}
+                </div>
+                {f.type === "select" && (f.options?.length ?? 0) > 0 && (
+                  <p className="text-[11px] text-gray-400 mt-0.5">Opções: {f.options.join(", ")}</p>
+                )}
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100">
+                <button onClick={() => setEdit(f.id)} className="p-1.5 hover:bg-gray-100 rounded text-gray-500"><Edit2 size={14} /></button>
+                <button onClick={async () => {
+                  if (!confirm(`Excluir campo "${f.label}"? Os valores existentes serão preservados nos contatos mas não aparecerão mais.`)) return;
+                  await fetch(`/api/custom-fields/${f.id}`, { method: "DELETE" });
+                  onChange();
+                }} className="p-1.5 hover:bg-red-100 rounded text-red-400"><Trash2 size={14} /></button>
+              </div>
+            </div>
+          )
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CampoForm({ initial, onCancel, onSaved }: any) {
+  const [label, setLabel] = useState(initial?.label ?? "");
+  const [key,   setKey]   = useState(initial?.key ?? "");
+  const [type,  setType]  = useState(initial?.type ?? "text");
+  const [options, setOptions] = useState<string[]>(initial?.options ?? []);
+  const [newOpt, setNewOpt] = useState("");
+  const [required, setRequired] = useState(initial?.required ?? false);
+  const [saving, setSaving] = useState(false);
+
+  // Auto-gera key a partir do label se for novo
+  useEffect(() => {
+    if (initial?.id) return;
+    const k = label.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9_\s]/g, "").trim().replace(/\s+/g, "_").slice(0, 30);
+    setKey(k);
+  }, [label, initial?.id]);
+
+  async function save() {
+    if (!label.trim() || !key.trim()) { toast.error("Label e key obrigatórios"); return; }
+    if (type === "select" && options.length === 0) { toast.error("Adicione pelo menos uma opção"); return; }
+    setSaving(true);
+    try {
+      const url = initial?.id ? `/api/custom-fields/${initial.id}` : "/api/custom-fields";
+      const method = initial?.id ? "PUT" : "POST";
+      const r = await fetch(url, {
+        method, headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, label, type, options, required }),
+      });
+      if (!r.ok) { const d = await r.json(); toast.error(d.error ?? "Erro"); return; }
+      toast.success(initial?.id ? "Atualizado" : "Criado");
+      onSaved();
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="px-4 py-4 bg-gray-50 flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Rótulo</label>
+          <input value={label} onChange={e => setLabel(e.target.value)} placeholder="Ex: Segmento" className={INP} />
+        </div>
+        <div>
+          <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Chave (id interno)</label>
+          <input value={key} onChange={e => setKey(e.target.value)} disabled={!!initial?.id}
+            className={INP + " font-mono disabled:bg-gray-100 disabled:text-gray-400"} />
+        </div>
+      </div>
+      <div>
+        <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Tipo</label>
+        <div className="flex gap-1.5 flex-wrap">
+          {FIELD_TYPES.map(t => (
+            <button key={t.key} type="button" onClick={() => setType(t.key)}
+              className={`text-xs px-3 py-1 rounded-full border font-medium ${type === t.key ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {type === "select" && (
+        <div>
+          <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Opções</label>
+          {options.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {options.map((o, i) => (
+                <div key={i} className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2 py-1">
+                  <span className="text-xs">{o}</span>
+                  <button onClick={() => setOptions(p => p.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400"><X size={11} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input value={newOpt} onChange={e => setNewOpt(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && newOpt.trim()) { e.preventDefault(); setOptions(p => [...p, newOpt.trim()]); setNewOpt(""); } }}
+              placeholder="Nova opção..." className={INP + " flex-1"} />
+            <button type="button" onClick={() => { if (newOpt.trim()) { setOptions(p => [...p, newOpt.trim()]); setNewOpt(""); } }}
+              className="bg-brand-600 text-white px-3 py-2 rounded-lg text-sm">+</button>
+          </div>
+        </div>
+      )}
+
+      <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+        <input type="checkbox" checked={required} onChange={e => setRequired(e.target.checked)}
+          className="rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+        Campo obrigatório
+      </label>
+
+      <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
+        <button onClick={onCancel} className="text-xs px-3 py-1.5 text-gray-600 border border-gray-200 rounded-lg hover:bg-white">Cancelar</button>
+        <button onClick={save} disabled={saving} className="text-xs px-3 py-1.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white rounded-lg font-medium">
+          {saving ? "Salvando..." : (initial?.id ? "Atualizar" : "Criar campo")}
+        </button>
+      </div>
+    </div>
   );
 }

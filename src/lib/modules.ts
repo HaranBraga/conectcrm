@@ -11,6 +11,7 @@ export const MODULES = [
   { key: "reunioes",  label: "Reuniões",   href: "/reunioes" },
   { key: "contatos",  label: "Contatos",   href: "/contatos" },
   { key: "campanhas", label: "Campanhas",  href: "/campanhas" },
+  { key: "relatorios", label: "Relatórios", href: "/relatorios" },
 ] as const;
 
 export type ModuleKey = (typeof MODULES)[number]["key"];

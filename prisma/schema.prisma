@@ -63,6 +63,9 @@ model Contact {
   source          String     @default("message")
   profilePhotoUrl String?
 
+  customFields    Json?                                // valores dos campos personalizados, { key: value }
+  contactNotes    ContactNote[]
+
   conversations Conversation[]
   groupMembers  GroupMember[]
   demandas           Demanda[]        @relation("ContactDemandas")
@@ -188,7 +191,36 @@ model User {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  contactNotes ContactNote[]
+
   @@index([username])
+}
+
+model ContactNote {
+  id        String   @id @default(cuid())
+  contactId String
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  body      String
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([contactId])
+  @@index([createdAt])
+}
+
+model ContactCustomField {
+  id        String   @id @default(cuid())
+  key       String   @unique                          // identificador (ex: "segmento")
+  label     String                                    // rótulo legível (ex: "Segmento")
+  type      String   @default("text")                 // text | number | date | boolean | select
+  options   String[] @default([])                     // se type=select
+  required  Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([position])
 }
 
 model Demanda {
