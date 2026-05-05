@@ -135,9 +135,12 @@ function SendOneModal({ cc, campaign, onClose, onSent }: any) {
       <div className="flex flex-col gap-4">
         <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
           <p><strong>Telefone:</strong> {cc.contact.phone}</p>
+          {(cc.assignedTo?.name || cc.contact?.parent?.name) && (
+            <p><strong>Líder:</strong> {cc.assignedTo?.name ?? cc.contact?.parent?.name}</p>
+          )}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Mensagem (já personalizada)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Mensagem (já personalizada — pode editar)</label>
           <textarea rows={6} value={msg} onChange={e => setMsg(e.target.value)}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none" />
         </div>
@@ -621,7 +624,13 @@ function ModeTab({ reuniao, mode, campaign, onCampaignCreated, onChange }: {
             )}
           </div>
           {pendentes > 0 && (
-            <button onClick={() => setBatchOpen(true)}
+            <button onClick={() => {
+              if (!campaign.messageTemplate?.trim()) {
+                toast.error("Configure a mensagem antes de enviar");
+                return;
+              }
+              setBatchOpen(true);
+            }}
               className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
               <Send size={14} /> Enviar em lote
             </button>
