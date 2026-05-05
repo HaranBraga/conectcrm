@@ -11,7 +11,7 @@ export async function GET() {
           contact: { select: { id: true, name: true, phone: true, role: true, lastContactAt: true, lastMessage: true, profilePhotoUrl: true, labels: true } },
           _count: { select: { demandas: true } },
         },
-        orderBy: { updatedAt: "desc" },
+        orderBy: [{ position: "asc" }, { updatedAt: "desc" }],
       },
     },
   });

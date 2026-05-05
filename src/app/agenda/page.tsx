@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { Modal } from "@/components/ui/Modal";
+import { ContactPicker } from "@/components/ui/ContactPicker";
 import { format, isSameDay, isToday, addMonths, subMonths, addWeeks, subWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
@@ -336,33 +337,31 @@ function EventForm({ initial, defaultDate, calendarios, onSave, onQuickSave, onC
 
       {/* Solicitante */}
       <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="text-xs font-medium text-gray-500">Solicitante</label>
-          <div className="flex gap-1">
-            {(["base", "manual"] as const).map(m => (
-              <button key={m} type="button" onClick={() => setSolicitanteMode(m)}
-                className={`text-xs px-2 py-0.5 rounded-full border ${solicitanteMode === m ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200"}`}>
-                {m === "base" ? "Na base" : "Não cadastrado"}
-              </button>
-            ))}
-          </div>
-        </div>
-        {solicitanteMode === "base" ? (
-          solicitante ? (
-            <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
-              <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-semibold text-indigo-700 shrink-0">
-                {solicitante.name?.[0]?.toUpperCase()}
-              </div>
-              <span className="flex-1 text-sm font-medium text-indigo-900">{solicitante.name}</span>
-              {solicitante.role && <RoleBadge role={solicitante.role} />}
-              <button type="button" onClick={() => setSolicitante(null)} className="text-indigo-300 hover:text-red-400"><X size={13} /></button>
+        <label className="text-xs font-medium text-gray-500 mb-1.5 block">Solicitante</label>
+        {solicitante ? (
+          <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
+            <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-semibold text-indigo-700 shrink-0">
+              {solicitante.name?.[0]?.toUpperCase()}
             </div>
-          ) : <ContactSearch placeholder="Buscar na base..." onSelect={setSolicitante} />
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            <input value={solNome} onChange={e => setSolNome(e.target.value)} placeholder="Nome" className={INP} />
-            <input value={solTel}  onChange={e => setSolTel(e.target.value)}  placeholder="Telefone" className={INP} />
+            <span className="flex-1 text-sm font-medium text-indigo-900">{solicitante.name}</span>
+            {solicitante.role && <RoleBadge role={solicitante.role} />}
+            <button type="button" onClick={() => { setSolicitante(null); setSolNome(""); setSolTel(""); setSolicitanteMode("base"); }} className="text-indigo-300 hover:text-red-400"><X size={13} /></button>
           </div>
+        ) : solNome || solTel ? (
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <span className="text-[10px] uppercase font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">novo</span>
+            <span className="flex-1 text-sm font-medium text-amber-900">{solNome || "(sem nome)"}</span>
+            {solTel && <span className="text-xs text-amber-600">{solTel}</span>}
+            <button type="button" onClick={() => { setSolNome(""); setSolTel(""); setSolicitanteMode("base"); }} className="text-amber-300 hover:text-red-400"><X size={13} /></button>
+          </div>
+        ) : (
+          <ContactPicker
+            placeholder="Buscar solicitante pelo nome ou telefone..."
+            onSelect={(s) => {
+              if (s.kind === "base") { setSolicitante(s.contact); setSolicitanteMode("base"); }
+              else { setSolNome(s.nome); setSolTel(s.telefone); setSolicitanteMode("manual"); }
+            }}
+          />
         )}
       </div>
 
@@ -372,7 +371,11 @@ function EventForm({ initial, defaultDate, calendarios, onSave, onQuickSave, onC
           <label className="block text-xs font-medium text-gray-500 mb-1.5">
             <Home size={11} className="inline mr-1" />Anfitriões (pode ser casal)
           </label>
-          <ContactSearch placeholder="Buscar anfitrião..." onSelect={addAnfitriao} />
+          <ContactPicker placeholder="Buscar anfitrião pelo nome ou telefone..."
+            onSelect={(s) => {
+              if (s.kind === "base") addAnfitriao(s.contact);
+              else toast.error("Anfitrião precisa estar cadastrado na base — cadastre o contato em Contatos antes");
+            }} />
           {anfitrioes.length > 0 && (
             <div className="flex flex-col gap-1.5 mt-2">
               {anfitrioes.map(a => (

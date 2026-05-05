@@ -26,29 +26,45 @@ export function KanbanBoard({ initialColumns, onRefresh }: Props) {
   }, []);
 
   const onDragEnd = useCallback(async (result: DropResult) => {
-    const { draggableId, destination, source } = result;
-    if (!destination || destination.droppableId === source.droppableId) return;
+    const { destination, source } = result;
+    // Drop fora de área válida ou na mesma posição: ignora
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
-    setColumns(prev => {
-      const next = prev.map(col => ({ ...col, conversations: [...col.conversations] }));
-      const from = next.find(c => c.id === source.droppableId)!;
-      const to   = next.find(c => c.id === destination.droppableId)!;
-      const [card] = from.conversations.splice(source.index, 1);
-      to.conversations.splice(destination.index, 0, card);
-      return next;
-    });
+    // Calcula novo estado das colunas após o drop
+    const sameCol = destination.droppableId === source.droppableId;
+    const next = columns.map(col => ({ ...col, conversations: [...col.conversations] }));
+    const from = next.find(c => c.id === source.droppableId)!;
+    const to   = sameCol ? from : next.find(c => c.id === destination.droppableId)!;
+    const [card] = from.conversations.splice(source.index, 1);
+    to.conversations.splice(destination.index, 0, card);
+
+    // Atualiza UI otimistamente
+    setColumns(next);
+
+    // Monta payload — só envia colunas afetadas
+    const affectedCols = sameCol
+      ? [from]
+      : [from, to];
+    const payload = {
+      columns: affectedCols.map(col => ({
+        statusId: col.id,
+        orderedIds: col.conversations.map((c: any) => c.id),
+      })),
+    };
 
     try {
-      await fetch("/api/conversations", {
-        method: "PATCH",
+      const r = await fetch("/api/conversations/order", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: draggableId, statusId: destination.droppableId }),
+        body: JSON.stringify(payload),
       });
+      if (!r.ok) throw new Error();
     } catch {
-      toast.error("Erro ao mover card");
+      toast.error("Erro ao salvar ordem");
       onRefresh();
     }
-  }, [onRefresh]);
+  }, [columns, onRefresh]);
 
   async function handleClose(conversationId: string) {
     setColumns(prev => prev.map(col => ({

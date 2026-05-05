@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { RoleBadge } from "@/components/ui/RoleBadge";
+import { ContactPicker, type ContactPickerSelection } from "@/components/ui/ContactPicker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
@@ -129,9 +130,6 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
       _key: `a${i}`, contactId: a.contactId, contact: a.contact,
     })) ?? []
   );
-  const [anfMode, setAnfMode] = useState<"base" | "manual">("base");
-  const [anfNome, setAnfNome] = useState("");
-  const [anfTel,  setAnfTel]  = useState("");
 
   // Presentes
   const [presentes, setPresentes] = useState<any[]>(
@@ -139,9 +137,6 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
       _key: `p${i}`, contactId: p.contactId, contact: p.contact, nome: p.nome, telefone: p.telefone,
     })) ?? []
   );
-  const [presMode,    setPresMode]    = useState<"base" | "manual">("base");
-  const [presNome,    setPresNome]    = useState("");
-  const [presTel,     setPresTel]     = useState("");
 
   // Avaliações: 3 slots, anônimas
   const initAval = (slot: number) => {
@@ -158,10 +153,9 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
     if (presentes.find(p => p.contactId === contact.id)) return;
     setPresentes(prev => [...prev, { _key: newKey("p"), contactId: contact.id, contact }]);
   }
-  function addPresenteManual() {
-    if (!presTel.trim() && !presNome.trim()) return;
-    setPresentes(prev => [...prev, { _key: newKey("pm"), nome: presNome.trim(), telefone: presTel.trim() }]);
-    setPresNome(""); setPresTel("");
+  function addPresenteManualDirect(nome: string, telefone: string) {
+    if (!nome.trim() && !telefone.trim()) return;
+    setPresentes(prev => [...prev, { _key: newKey("pm"), nome: nome.trim(), telefone: telefone.trim() }]);
   }
 
   function addAnfitriaoBase(contact: any) {
@@ -169,12 +163,11 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
     setAnfitrioes(prev => [...prev, { _key: newKey("a"), contactId: contact.id, contact }]);
     addPresenteBase(contact);
   }
-  function addAnfitriaoManual() {
-    if (!anfTel.trim() && !anfNome.trim()) return;
-    const entry = { nome: anfNome.trim(), telefone: anfTel.trim() };
+  function addAnfitriaoManualDirect(nome: string, telefone: string) {
+    if (!telefone.trim() && !nome.trim()) return;
+    const entry = { nome: nome.trim(), telefone: telefone.trim() };
     setAnfitrioes(prev => [...prev, { _key: newKey("am"), ...entry }]);
     setPresentes(prev => [...prev, { _key: newKey("pm"), ...entry }]);
-    setAnfNome(""); setAnfTel("");
   }
 
   function updateAval(slot: number, patch: any) {
@@ -278,31 +271,19 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
         )}
       </section>
 
-      {/* Anfitriões da casa — base ou manual */}
+      {/* Anfitriões da casa — busca primeiro, cadastra novo se não achar */}
       <section>
         <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">
           <Home size={11} className="inline mr-1" />Anfitriões da Casa
         </h3>
-        <div className="flex gap-1.5 mb-2">
-          {(["base", "manual"] as const).map(m => (
-            <button key={m} type="button" onClick={() => setAnfMode(m)}
-              className={`text-xs px-3 py-1 rounded-full border font-medium transition-all ${anfMode === m ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
-              {m === "base" ? "Da base" : "Número novo"}
-            </button>
-          ))}
-        </div>
 
-        {anfMode === "base" ? (
-          <ContactSearch placeholder="Buscar anfitrião na base..." onSelect={addAnfitriaoBase} />
-        ) : (
-          <div className="flex gap-2">
-            <input value={anfNome} onChange={e => setAnfNome(e.target.value)} placeholder="Nome" className={`${INP} flex-1`} />
-            <input value={anfTel}  onChange={e => setAnfTel(e.target.value)}  placeholder="Telefone" className={`${INP} flex-1`} />
-            <button type="button" onClick={addAnfitriaoManual} className="bg-brand-600 text-white px-3 py-2 rounded-lg text-sm font-medium">
-              <Plus size={15} />
-            </button>
-          </div>
-        )}
+        <ContactPicker
+          placeholder="Buscar anfitrião pelo nome ou telefone..."
+          onSelect={(s: ContactPickerSelection) => {
+            if (s.kind === "base") addAnfitriaoBase(s.contact);
+            else addAnfitriaoManualDirect(s.nome, s.telefone);
+          }}
+        />
 
         {anfitrioes.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
@@ -337,26 +318,13 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
         <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">
           <Users size={11} className="inline mr-1" />Lista de Presentes ({presentes.length})
         </h3>
-        <div className="flex gap-1.5 mb-2">
-          {(["base", "manual"] as const).map(m => (
-            <button key={m} type="button" onClick={() => setPresMode(m)}
-              className={`text-xs px-3 py-1 rounded-full border font-medium transition-all ${presMode === m ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
-              {m === "base" ? "Da base" : "Número novo"}
-            </button>
-          ))}
-        </div>
-
-        {presMode === "base" ? (
-          <ContactSearch placeholder="Buscar contato para adicionar..." onSelect={addPresenteBase} />
-        ) : (
-          <div className="flex gap-2">
-            <input value={presNome} onChange={e => setPresNome(e.target.value)} placeholder="Nome" className={`${INP} flex-1`} />
-            <input value={presTel}  onChange={e => setPresTel(e.target.value)}  placeholder="Telefone" className={`${INP} flex-1`} />
-            <button type="button" onClick={addPresenteManual} className="bg-brand-600 text-white px-3 py-2 rounded-lg text-sm font-medium">
-              <Plus size={15} />
-            </button>
-          </div>
-        )}
+        <ContactPicker
+          placeholder="Buscar presente pelo nome ou telefone..."
+          onSelect={(s: ContactPickerSelection) => {
+            if (s.kind === "base") addPresenteBase(s.contact);
+            else addPresenteManualDirect(s.nome, s.telefone);
+          }}
+        />
 
         {presentes.length > 0 && (
           <div className="mt-2 max-h-40 overflow-y-auto bg-gray-50 rounded-lg divide-y divide-gray-100 border border-gray-200">
