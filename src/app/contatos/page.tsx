@@ -77,7 +77,10 @@ function ContactForm({ initial, onSave, onClose, contacts, roles }: {
             <label className="block text-sm font-medium text-gray-700 mb-1">Telefone * <span className="text-xs text-gray-400">DDD + número</span></label>
             <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-brand-500">
               <span className="px-3 py-2 bg-gray-50 text-gray-400 text-sm border-r border-gray-200 select-none">+55</span>
-              <input required value={form.phone} onChange={f("phone")} placeholder="11999999999" className="flex-1 px-3 py-2 text-sm focus:outline-none" />
+              <input required type="tel" inputMode="numeric" pattern="[0-9]*"
+                value={form.phone}
+                onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
+                placeholder="11999999999" className="flex-1 px-3 py-2 text-sm focus:outline-none" />
             </div>
           </div>
           <div>

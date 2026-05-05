@@ -64,7 +64,10 @@ function NewContactModal({ phone, name, onSave, onClose }: any) {
         <h3 className="font-semibold text-gray-900 mb-4">Salvar contato</h3>
         <form onSubmit={save} className="flex flex-col gap-3">
           <input required value={form.name} onChange={f("name")} placeholder="Nome *" className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <input required value={form.phone} onChange={f("phone")} placeholder="Telefone *" className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <input required type="tel" inputMode="numeric" pattern="[0-9]*"
+            value={form.phone}
+            onChange={(e) => setForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
+            placeholder="Telefone *" className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
             <button disabled={saving} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-medium">{saving ? "Salvando..." : "Salvar"}</button>

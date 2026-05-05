@@ -26,7 +26,7 @@ function NewContactQuick({ onSave, onClose, roles }: { onSave: () => void; onClo
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
       <div><label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label><input required value={form.name} onChange={f("name")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" /></div>
-      <div><label className="block text-sm font-medium text-gray-700 mb-1">Telefone * <span className="text-gray-400">(somente números)</span></label><input required value={form.phone} onChange={f("phone")} placeholder="5511999999999" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" /></div>
+      <div><label className="block text-sm font-medium text-gray-700 mb-1">Telefone * <span className="text-gray-400">(somente números)</span></label><input required type="tel" inputMode="numeric" pattern="[0-9]*" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))} placeholder="5511999999999" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" /></div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Cargo</label>
         <select value={form.roleId} onChange={f("roleId")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
