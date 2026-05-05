@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, Search, Clock, Phone, ChevronRight, Edit2 } from "lucide-react";
 import { RoleBadge, type PersonRole } from "@/components/ui/RoleBadge";
 import { Modal } from "@/components/ui/Modal";
+import { ContactNotes } from "@/components/ui/ContactNotes";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
@@ -144,10 +145,11 @@ function ContactForm({ initial, onSave, onClose, contacts, roles }: {
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
-        <textarea rows={2} value={form.notes} onChange={f("notes")} className={`${inp} resize-none`} />
-      </div>
+      {initial?.id ? (
+        <ContactNotes contactId={initial.id} />
+      ) : (
+        <p className="text-xs text-gray-400 italic">As anotações ficam disponíveis após salvar o contato.</p>
+      )}
 
       <div className="flex justify-end gap-3 pt-1 border-t border-gray-100">
         <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
@@ -270,9 +272,6 @@ export default function ContatosPage() {
                         </span>
                       );
                     })()}
-                    {c._count && c._count.children > 0 && (
-                      <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{c._count.children} na rede</span>
-                    )}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => { setEditing(c); setModal("edit"); }} className="p-1.5 hover:bg-gray-200 rounded text-gray-500"><Edit2 size={14} /></button>
                     </div>
