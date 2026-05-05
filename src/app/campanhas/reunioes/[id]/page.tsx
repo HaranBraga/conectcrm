@@ -255,8 +255,8 @@ function ParticipantsList({ items, label }: { items: any[]; label: string }) {
 }
 
 function AdvancedConfig({ campaign, onChange }: { campaign: any; onChange: () => void }) {
-  const [open, setOpen] = useState(false);
   const [status, setStatus] = useState(campaign.status);
+  const [description, setDescription] = useState(campaign.description ?? "");
   const [mediaUrl, setMediaUrl] = useState<string | null>(campaign.mediaUrl);
   const [mediaType, setMediaType] = useState<string | null>(campaign.mediaType);
   const [linkUrl, setLinkUrl] = useState(campaign.linkUrl ?? "");
@@ -267,11 +267,12 @@ function AdvancedConfig({ campaign, onChange }: { campaign: any; onChange: () =>
 
   useEffect(() => {
     setStatus(campaign.status);
+    setDescription(campaign.description ?? "");
     setMediaUrl(campaign.mediaUrl);
     setMediaType(campaign.mediaType);
     setLinkUrl(campaign.linkUrl ?? "");
     setTags(campaign.responseTags ?? []);
-  }, [campaign.id, campaign.status, campaign.mediaUrl, campaign.mediaType, campaign.linkUrl, campaign.responseTags]);
+  }, [campaign.id, campaign.status, campaign.description, campaign.mediaUrl, campaign.mediaType, campaign.linkUrl, campaign.responseTags]);
 
   async function uploadMedia(file: File) {
     setUploading(true);
@@ -291,7 +292,7 @@ function AdvancedConfig({ campaign, onChange }: { campaign: any; onChange: () =>
     try {
       const r = await fetch(`/api/campaigns/${campaign.id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, mediaUrl, mediaType, linkUrl: linkUrl || null }),
+        body: JSON.stringify({ status, description, mediaUrl, mediaType, linkUrl: linkUrl || null }),
       });
       if (!r.ok) { toast.error("Erro ao salvar"); return; }
       toast.success("Configurações salvas");
@@ -320,25 +321,30 @@ function AdvancedConfig({ campaign, onChange }: { campaign: any; onChange: () =>
 
   return (
     <section className="bg-white border border-gray-200 rounded-xl">
-      <button type="button" onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-        <span className="flex items-center gap-2"><Settings size={14} /> Configurações avançadas</span>
-        {open ? <ChevronUp size={15} className="text-gray-400" /> : <ChevronDown size={15} className="text-gray-400" />}
-      </button>
-      {open && (
-        <div className="px-4 pb-4 flex flex-col gap-4">
-          {/* Status */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 mb-1.5">Status</p>
-            <div className="flex gap-1.5">
-              {(["ATIVA", "PAUSADA", "CONCLUIDA"] as const).map(s => (
-                <button key={s} type="button" onClick={() => setStatus(s)}
-                  className={`text-xs px-3 py-1 rounded-full border font-medium ${status === s ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
-                  {s === "ATIVA" ? "Ativa" : s === "PAUSADA" ? "Pausada" : "Concluída"}
-                </button>
-              ))}
-            </div>
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2 text-sm font-semibold text-gray-700">
+        <Settings size={14} /> Configurações do disparo
+      </div>
+      <div className="px-4 py-4 flex flex-col gap-4">
+        {/* Status */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 mb-1.5">Status</p>
+          <div className="flex gap-1.5">
+            {(["ATIVA", "PAUSADA", "CONCLUIDA"] as const).map(s => (
+              <button key={s} type="button" onClick={() => setStatus(s)}
+                className={`text-xs px-3 py-1 rounded-full border font-medium ${status === s ? "bg-brand-600 text-white border-transparent" : "text-gray-500 border-gray-200 bg-white"}`}>
+                {s === "ATIVA" ? "Ativa" : s === "PAUSADA" ? "Pausada" : "Concluída"}
+              </button>
+            ))}
           </div>
+        </div>
+
+        {/* Descrição */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 mb-1.5">Descrição (opcional)</p>
+          <textarea value={description} onChange={e => setDescription(e.target.value)}
+            rows={2} placeholder="Anote o objetivo do disparo, observações..."
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500" />
+        </div>
 
           {/* Mídia */}
           <div>
@@ -400,8 +406,7 @@ function AdvancedConfig({ campaign, onChange }: { campaign: any; onChange: () =>
               <Save size={12} /> {saving ? "Salvando..." : "Salvar configurações"}
             </button>
           </div>
-        </div>
-      )}
+      </div>
     </section>
   );
 }

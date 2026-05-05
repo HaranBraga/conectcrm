@@ -1,11 +1,12 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Megaphone, Users } from "lucide-react";
+import { Megaphone, Users, Cake } from "lucide-react";
 
 const tabs = [
-  { href: "/campanhas",          label: "Campanhas", icon: Megaphone },
-  { href: "/campanhas/reunioes", label: "Reuniões",  icon: Users     },
+  { href: "/campanhas",              label: "Campanhas",     icon: Megaphone },
+  { href: "/campanhas/reunioes",     label: "Reuniões",      icon: Users     },
+  { href: "/campanhas/aniversarios", label: "Aniversários",  icon: Cake      },
 ];
 
 export function CampanhasTabs() {
