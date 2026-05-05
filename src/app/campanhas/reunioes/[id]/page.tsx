@@ -707,7 +707,7 @@ export default function ReuniaoDispatchPage() {
     <div className="flex flex-col h-screen">
       <header className="bg-white border-b border-gray-200 shrink-0">
         <div className="flex items-center gap-3 px-6 py-4">
-          <Link href="/campanhas/reunioes" className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500">
+          <Link href="/reunioes" className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500" title="Voltar para Reuniões">
             <ArrowLeft size={18} />
           </Link>
           <div className="flex-1 min-w-0">

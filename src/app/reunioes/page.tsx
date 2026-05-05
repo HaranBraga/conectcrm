@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import {
   Plus, Search, Users, MapPin, Calendar, Clock,
-  Trash2, Edit2, Star, X, Home,
+  Trash2, Edit2, Star, X, Home, Send,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { RoleBadge } from "@/components/ui/RoleBadge";
@@ -488,6 +489,11 @@ export default function ReunioesPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      <Link href={`/campanhas/reunioes/${r.id}`}
+                        title="Gerenciar disparos desta reunião"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium">
+                        <Send size={11} /> Disparos
+                      </Link>
                       <button onClick={() => { setSelected(r); setModal("editar"); }}
                         className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600">
                         <Edit2 size={14} />

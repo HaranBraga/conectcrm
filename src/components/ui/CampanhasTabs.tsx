@@ -1,11 +1,10 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Megaphone, Users, Cake } from "lucide-react";
+import { Megaphone, Cake } from "lucide-react";
 
 const tabs = [
   { href: "/campanhas",              label: "Campanhas",     icon: Megaphone },
-  { href: "/campanhas/reunioes",     label: "Reuniões",      icon: Users     },
   { href: "/campanhas/aniversarios", label: "Aniversários",  icon: Cake      },
 ];
 
