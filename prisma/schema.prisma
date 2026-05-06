@@ -210,12 +210,10 @@ model User {
   @@index([username])
 }
 
-/**
- * Log de auditoria — registra ações relevantes do sistema.
- * Não é exaustivo: foca em CRUD de entidades importantes (users, contatos,
- * campanhas, demandas), envios (campanha/aniversário) e auth (login, troca
- * de senha). Admin consulta em /configuracoes → aba Logs.
- */
+// Log de auditoria — registra ações relevantes do sistema.
+// Não é exaustivo: foca em CRUD de entidades importantes (users, contatos,
+// campanhas, demandas), envios (campanha/aniversário) e auth (login, troca
+// de senha). Admin consulta em /configuracoes → aba Logs.
 model AuditLog {
   id        String   @id @default(cuid())
   userId    String?
