@@ -42,12 +42,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Título e início são obrigatórios" }, { status: 400 });
   }
 
+  // Se o solicitante veio só como nome+tel (sem id), tenta resolver pra um
+  // Contact (find por phone, ou cria com source="agenda" pra aparecer na
+  // aba "Novos" de /contatos pra triar depois).
+  let resolvedSolicitanteId: string | null = solicitanteId || null;
+  if (!resolvedSolicitanteId && solicitanteTel?.trim()) {
+    const phone = String(solicitanteTel).replace(/\D/g, "");
+    if (phone) {
+      let c = await prisma.contact.findFirst({ where: { phone } });
+      if (!c) {
+        const defaultRole = await prisma.personRole.findFirst({ orderBy: { level: "desc" } });
+        if (defaultRole) {
+          c = await prisma.contact.create({
+            data: {
+              name: solicitanteNome?.trim() || phone,
+              phone,
+              roleId: defaultRole.id,
+              source: "agenda",
+            },
+          });
+        }
+      }
+      if (c) resolvedSolicitanteId = c.id;
+    }
+  }
+
   const evento = await prisma.agendaEvento.create({
     data: {
       titulo: titulo.trim(), assunto, tipo: tipo ?? "AGENDA", status: status ?? "PENDENTE",
       inicio: new Date(inicio), duracao,
       local, bairro, zona, quantidadePessoas, oQuePrecisa, notes,
-      solicitanteId: solicitanteId || null,
+      solicitanteId: resolvedSolicitanteId,
       solicitanteNome: solicitanteNome || null,
       solicitanteTel: solicitanteTel || null,
       demandaId:    demandaId    || null,

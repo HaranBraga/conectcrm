@@ -10,11 +10,26 @@ export async function GET(req: NextRequest) {
   const roleId = searchParams.get("roleId")  ?? undefined;
   const page   = Math.max(1, parseInt(searchParams.get("page")  ?? "1"));
   const limit  = Math.min(100, parseInt(searchParams.get("limit") ?? "50"));
+  // source: aceita lista separada por vírgula ("reuniao,agenda") ou keyword especial:
+  //   - "novos"  → reuniao OR agenda (não promovidos)
+  //   - "base"   → tudo exceto reuniao/agenda
+  // Sem param: comportamento antigo (todos).
+  const sourceParam = searchParams.get("source") ?? "";
+
+  let sourceFilter: any = undefined;
+  if (sourceParam === "novos") {
+    sourceFilter = { in: ["reuniao", "agenda"] };
+  } else if (sourceParam === "base") {
+    sourceFilter = { notIn: ["reuniao", "agenda"] };
+  } else if (sourceParam) {
+    sourceFilter = { in: sourceParam.split(",").map(s => s.trim()).filter(Boolean) };
+  }
 
   const where: any = {
     AND: [
       search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { phone: { contains: search } }] } : {},
       roleId ? { roleId } : {},
+      sourceFilter ? { source: sourceFilter } : {},
     ],
   };
 
