@@ -304,17 +304,24 @@ function DemandaCard({ demanda, index, onClick, cfg }: { demanda: any; index: nu
           className={`bg-white rounded-xl border border-gray-100 shadow-sm p-3 mb-2 cursor-pointer hover:shadow-md transition-shadow border-l-[3px] ${snapshot.isDragging ? "shadow-lg opacity-90" : ""}`}
           style={{ ...provided.draggableProps.style, borderLeftColor: borderColor(p) }}
         >
-          <div className="flex items-start gap-1.5 mb-2">
-            <p className="font-medium text-gray-900 text-sm leading-snug flex-1 line-clamp-2">{demanda.titulo}</p>
+          <div className="flex items-start gap-1.5 mb-1.5">
+            <p className="font-semibold text-gray-900 text-[15px] leading-snug flex-1 line-clamp-2">{demanda.titulo}</p>
             <div className="flex items-center gap-1 shrink-0 mt-0.5">
               {hasRem && <Bell size={13} className="text-amber-500" title="Lembrete!" />}
               {demanda.conversa && <LinkIcon size={11} className="text-indigo-400" />}
             </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
-            <User size={11} className="shrink-0" />
-            <span className="truncate">{demanda.solicitante?.name}</span>
-            {demanda.solicitante?.role && <RoleBadge role={demanda.solicitante.role} />}
+          <div className="flex items-center gap-1.5 mb-2 min-w-0">
+            <User size={11} className="shrink-0 text-gray-400" />
+            <span className="truncate text-[13px] font-medium text-gray-700">{demanda.solicitante?.name}</span>
+            {demanda.solicitante?.role && (
+              <span
+                className="inline-block text-[9px] font-medium px-1.5 py-px rounded-full leading-none uppercase tracking-wide shrink-0"
+                style={{ color: demanda.solicitante.role.color, backgroundColor: demanda.solicitante.role.bgColor }}
+              >
+                {demanda.solicitante.role.label}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1 flex-wrap">
             <span className="text-[11px] font-medium px-2 py-0.5 rounded-full"
