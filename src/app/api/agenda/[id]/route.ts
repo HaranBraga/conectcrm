@@ -32,6 +32,30 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     await prisma.agendaAnfitriao.deleteMany({ where: { eventoId: params.id } });
   }
 
+  // Se solicitante mudou pra manual (nome+tel sem id), find-or-create Contact
+  // com source="agenda" pra aparecer na aba "Novos" depois.
+  let resolvedSolicitanteId: string | null | undefined = solicitanteId;
+  if (solicitanteId === null && solicitanteTel?.trim()) {
+    const phone = String(solicitanteTel).replace(/\D/g, "");
+    if (phone) {
+      let c = await prisma.contact.findFirst({ where: { phone } });
+      if (!c) {
+        const defaultRole = await prisma.personRole.findFirst({ orderBy: { level: "desc" } });
+        if (defaultRole) {
+          c = await prisma.contact.create({
+            data: {
+              name: solicitanteNome?.trim() || phone,
+              phone,
+              roleId: defaultRole.id,
+              source: "agenda",
+            },
+          });
+        }
+      }
+      if (c) resolvedSolicitanteId = c.id;
+    }
+  }
+
   const evento = await prisma.agendaEvento.update({
     where: { id: params.id },
     data: {
@@ -47,7 +71,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       ...(quantidadePessoas !== undefined && { quantidadePessoas }),
       ...(oQuePrecisa  !== undefined && { oQuePrecisa }),
       ...(notes        !== undefined && { notes }),
-      ...(solicitanteId  !== undefined && { solicitanteId: solicitanteId || null }),
+      ...(solicitanteId  !== undefined && { solicitanteId: resolvedSolicitanteId ?? null }),
       ...(solicitanteNome !== undefined && { solicitanteNome }),
       ...(solicitanteTel  !== undefined && { solicitanteTel }),
       ...(demandaId    !== undefined && { demandaId: demandaId || null }),

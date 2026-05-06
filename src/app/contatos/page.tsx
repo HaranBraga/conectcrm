@@ -25,6 +25,9 @@ function withBR(phone: string) {
   const d = phone.replace(/\D/g, "");
   return d.startsWith("55") ? d : `55${d}`;
 }
+// Formato no input: 11 dígitos puros (DDD + número), ex: 68999551835
+// Por baixo, ainda salvamos com 55 prefixado pra manter compat com Evolution
+// e webhook (que recebem mensagens com código país).
 function stripBR(phone: string) {
   const d = phone.replace(/\D/g, "");
   return d.startsWith("55") ? d.slice(2) : d;
@@ -99,14 +102,12 @@ function ContactForm({ initial, onSave, onClose, contacts, roles, promoteMode = 
             <input required value={form.name} onChange={f("name")} className={inp} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Telefone * <span className="text-xs text-gray-400">DDD + número</span></label>
-            <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-brand-500">
-              <span className="px-3 py-2 bg-gray-50 text-gray-400 text-sm border-r border-gray-200 select-none">+55</span>
-              <input required type="tel" inputMode="numeric" pattern="[0-9]*"
-                value={form.phone}
-                onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
-                placeholder="11999999999" className="flex-1 px-3 py-2 text-sm focus:outline-none" />
-            </div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Telefone * <span className="text-xs text-gray-400">DDD + número (11 dígitos)</span></label>
+            <input required type="tel" inputMode="numeric" pattern="[0-9]{10,11}"
+              value={form.phone} maxLength={11}
+              onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "").slice(0, 11) }))}
+              placeholder="68999551835"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
@@ -190,120 +191,121 @@ function ContactForm({ initial, onSave, onClose, contacts, roles, promoteMode = 
   );
 }
 
-// ─── Card "Novos" com origens ───────────────────────────────────────────────
+// ─── Aba "Novos": agrupamento por origem ─────────────────────────────────────
 
-function NovoContactCard({ contact, onPromote, onDelete }: {
+interface OriginGroup {
+  type: "reuniao" | "agenda";
+  id: string;
+  titulo: string;
+  when: string;
+  local: string | null;
+  contacts: Contact[];
+}
+
+function ContactRow({ contact, onPromote, onDelete }: {
   contact: Contact;
   onPromote: (c: Contact) => void;
   onDelete: (c: Contact) => void;
 }) {
-  const [origins, setOrigins] = useState<{ reunioes: any[]; agenda: any[]; total: number } | null>(null);
-  const [loadingOrigins, setLoadingOrigins] = useState(false);
-  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 group">
+      <div className="w-8 h-8 rounded-full flex items-center justify-center font-semibold text-xs shrink-0"
+        style={{ backgroundColor: contact.role?.bgColor ?? "#f3f4f6", color: contact.role?.color ?? "#6b7280" }}>
+        {contact.name[0]?.toUpperCase()}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-medium text-gray-900 text-sm truncate">{contact.name}</p>
+          {(contact as any)._role && (
+            <span className="text-[9px] uppercase tracking-wide font-semibold text-violet-500">
+              {(contact as any)._role}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
+          <Phone size={10} />
+          <span>{stripBR(contact.phone)}</span>
+        </div>
+      </div>
+      <button
+        onClick={() => onPromote(contact)}
+        className="flex items-center gap-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg px-2.5 py-1.5 shrink-0"
+      >
+        <ArrowRight size={11} /> Mover pra base
+      </button>
+      <button
+        onClick={() => onDelete(contact)}
+        className="text-xs text-gray-300 hover:text-red-500 px-1.5 py-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        title="Excluir contato"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
 
-  async function loadOrigins() {
-    if (origins || loadingOrigins) return;
-    setLoadingOrigins(true);
-    try {
-      const r = await fetch(`/api/contacts/${contact.id}/origins`);
-      if (r.ok) setOrigins(await r.json());
-    } finally {
-      setLoadingOrigins(false);
-    }
-  }
-
-  function toggleOpen() {
-    setOpen(o => !o);
-    loadOrigins();
-  }
-
-  const sourceBadge =
-    contact.source === "reuniao" ? { label: "Reunião", icon: Handshake, color: "text-violet-700", bg: "bg-violet-50", border: "border-violet-200" } :
-    contact.source === "agenda"  ? { label: "Agenda",  icon: Calendar,  color: "text-blue-700",   bg: "bg-blue-50",   border: "border-blue-200"  } :
-                                   { label: "Novo",    icon: Sparkles,  color: "text-gray-700",   bg: "bg-gray-50",   border: "border-gray-200"  };
-  const Icon = sourceBadge.icon;
+function OriginGroupCard({ group, onPromote, onDelete }: {
+  group: OriginGroup;
+  onPromote: (c: Contact) => void;
+  onDelete: (c: Contact) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const isReuniao = group.type === "reuniao";
+  const accent = isReuniao
+    ? { color: "violet", icon: Handshake, label: "Reunião" }
+    : { color: "blue",   icon: Calendar,  label: "Agenda" };
+  const Icon = accent.icon;
+  const href = isReuniao ? `/reunioes/${group.id}` : `/agenda?evento=${group.id}`;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="flex items-center gap-4 px-4 py-3">
-        <div className="w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm shrink-0" style={{ backgroundColor: contact.role.bgColor, color: contact.role.color }}>
-          {contact.name[0]?.toUpperCase()}
+    <div className={`bg-white rounded-xl border-l-[3px] border border-gray-200 overflow-hidden ${
+      isReuniao ? "border-l-violet-400" : "border-l-blue-400"
+    }`}>
+      <div className="flex items-center gap-3 px-4 py-3 bg-gray-50/60">
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+          isReuniao ? "bg-violet-100 text-violet-600" : "bg-blue-100 text-blue-600"
+        }`}>
+          <Icon size={16} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-semibold text-gray-900 text-[15px] truncate">{contact.name}</p>
-            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${sourceBadge.bg} ${sourceBadge.color} ${sourceBadge.border}`}>
-              <Icon size={10} /> {sourceBadge.label}
-            </span>
+            <span className={`text-[10px] font-semibold uppercase tracking-wide ${
+              isReuniao ? "text-violet-600" : "text-blue-600"
+            }`}>{accent.label}</span>
+            <a href={href} className="font-semibold text-gray-900 text-[15px] truncate hover:underline">
+              {group.titulo}
+            </a>
           </div>
           <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5 flex-wrap">
-            <span className="flex items-center gap-1"><Phone size={10} />{stripBR(contact.phone)}</span>
-            {contact.parent && <span className="flex items-center gap-0.5 text-gray-400"><ChevronRight size={10} />{contact.parent.name}</span>}
+            <span className="flex items-center gap-1">
+              <Calendar size={10} />
+              {format(new Date(group.when), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+            </span>
+            {group.local && (
+              <span className="flex items-center gap-1 text-gray-400">
+                <MapPin size={10} />{group.local}
+              </span>
+            )}
           </div>
         </div>
+        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${
+          isReuniao ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"
+        }`}>
+          {group.contacts.length} novo{group.contacts.length > 1 ? "s" : ""}
+        </span>
         <button
-          onClick={toggleOpen}
-          className="text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 shrink-0"
+          onClick={() => setOpen(o => !o)}
+          className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 shrink-0"
         >
-          {open ? "Esconder origem" : "Ver origem"}
-        </button>
-        <button
-          onClick={() => onPromote(contact)}
-          className="flex items-center gap-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg px-3 py-1.5 shrink-0"
-        >
-          <ArrowRight size={12} /> Mover pra base
-        </button>
-        <button
-          onClick={() => onDelete(contact)}
-          className="text-xs text-gray-300 hover:text-red-500 px-2 py-1 shrink-0"
-          title="Excluir contato"
-        >
-          ✕
+          {open ? "Esconder" : "Mostrar"}
         </button>
       </div>
 
       {open && (
-        <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
-          {loadingOrigins && <p className="text-xs text-gray-400">Carregando origem...</p>}
-          {!loadingOrigins && origins && origins.total === 0 && (
-            <p className="text-xs text-gray-400 italic">Sem referências encontradas.</p>
-          )}
-          {!loadingOrigins && origins && origins.total > 0 && (
-            <div className="space-y-2">
-              {origins.reunioes.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Reuniões</p>
-                  <div className="space-y-1">
-                    {origins.reunioes.map((r) => (
-                      <a key={r.id} href={`/reunioes/${r.id}`}
-                        className="flex items-center gap-2 bg-white border border-violet-100 rounded-lg px-3 py-1.5 text-xs hover:border-violet-300">
-                        <Handshake size={11} className="text-violet-500 shrink-0" />
-                        <span className="font-medium text-gray-800 truncate">{r.titulo}</span>
-                        <span className="text-gray-400 text-[10px]">{format(new Date(r.dataHora), "dd/MM/yyyy HH:mm", { locale: ptBR })}</span>
-                        {r.local && <span className="text-gray-400 flex items-center gap-0.5 text-[10px] truncate"><MapPin size={9} />{r.local}</span>}
-                        <span className="ml-auto text-[10px] uppercase tracking-wide text-violet-500 font-semibold shrink-0">{r.role}</span>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {origins.agenda.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Eventos da Agenda</p>
-                  <div className="space-y-1">
-                    {origins.agenda.map((e) => (
-                      <div key={e.id} className="flex items-center gap-2 bg-white border border-blue-100 rounded-lg px-3 py-1.5 text-xs">
-                        <Calendar size={11} className="text-blue-500 shrink-0" />
-                        <span className="font-medium text-gray-800 truncate">{e.titulo}</span>
-                        <span className="text-gray-400 text-[10px]">{format(new Date(e.inicio), "dd/MM/yyyy HH:mm", { locale: ptBR })}</span>
-                        {e.local && <span className="text-gray-400 flex items-center gap-0.5 text-[10px] truncate"><MapPin size={9} />{e.local}</span>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+        <div className="divide-y divide-gray-100">
+          {group.contacts.map(c => (
+            <ContactRow key={c.id} contact={c} onPromote={onPromote} onDelete={onDelete} />
+          ))}
         </div>
       )}
     </div>
@@ -313,7 +315,8 @@ function NovoContactCard({ contact, onPromote, onDelete }: {
 export default function ContatosPage() {
   const [tab, setTab] = useState<"base" | "novos">("base");
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [novos, setNovos]       = useState<Contact[]>([]);
+  const [novosGroups, setNovosGroups] = useState<OriginGroup[]>([]);
+  const [novosOrphans, setNovosOrphans] = useState<Contact[]>([]);
   const [novosTotal, setNovosTotal] = useState(0);
   const [roles, setRoles]       = useState<PersonRole[]>([]);
   const [search, setSearch]     = useState("");
@@ -343,11 +346,12 @@ export default function ContatosPage() {
   }, [search, roleFilter]);
 
   const loadNovos = useCallback(async () => {
-    const params = new URLSearchParams({ source: "novos", limit: "100" });
-    const res = await fetch(`/api/contacts?${params}`);
+    const res = await fetch(`/api/contacts/novos-grouped`);
+    if (!res.ok) return;
     const data = await res.json();
-    setNovos(data.contacts ?? []);
-    setNovosTotal(data.total ?? 0);
+    setNovosGroups(data.groups ?? []);
+    setNovosOrphans(data.orphans ?? []);
+    setNovosTotal(data.totalContacts ?? 0);
   }, []);
 
   useEffect(() => { loadRoles(); load(); loadNovos(); }, [loadRoles, loadNovos]);
@@ -496,22 +500,51 @@ export default function ContatosPage() {
         </>
       ) : (
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {novos.length === 0 ? (
+          {novosTotal === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-gray-400">
               <Sparkles size={32} className="text-gray-300 mb-2" />
               <p className="font-medium">Nenhum contato aguardando triagem</p>
               <p className="text-sm mt-1">Contatos criados via reuniões e agenda aparecem aqui antes de virarem da base</p>
             </div>
           ) : (
-            <div className="space-y-2 max-w-4xl mx-auto">
-              {novos.map(c => (
-                <NovoContactCard
-                  key={c.id}
-                  contact={c}
+            <div className="space-y-3 max-w-4xl mx-auto">
+              {novosGroups.map(g => (
+                <OriginGroupCard
+                  key={`${g.type}-${g.id}`}
+                  group={g}
                   onPromote={(c) => { setEditing(c); setModal("promote"); }}
                   onDelete={handleDeleteNovo}
                 />
               ))}
+
+              {novosOrphans.length > 0 && (
+                <div className="bg-white rounded-xl border-l-[3px] border-l-gray-300 border border-gray-200 overflow-hidden">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-gray-50/60">
+                    <div className="w-9 h-9 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center shrink-0">
+                      <Sparkles size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Sem origem ativa</span>
+                      <p className="text-sm text-gray-600">
+                        Contatos criados antigamente ou cuja reunião/evento foi removido
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 shrink-0">
+                      {novosOrphans.length}
+                    </span>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {novosOrphans.map(c => (
+                      <ContactRow
+                        key={c.id}
+                        contact={c}
+                        onPromote={(c) => { setEditing(c); setModal("promote"); }}
+                        onDelete={handleDeleteNovo}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
