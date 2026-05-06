@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcast } from "@/lib/sse";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,5 +37,13 @@ export async function POST(req: NextRequest) {
 
   await prisma.$transaction(updates);
   broadcast("kanban", { action: "reordered" });
+
+  await logAudit({
+    action: "kanban.move",
+    summary: `Reorganizou kanban (${columns.length} coluna(s), ${updates.length} card(s))`,
+    meta: { columns: columns.length, cards: updates.length },
+    req,
+  });
+
   return NextResponse.json({ ok: true });
 }

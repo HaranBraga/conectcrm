@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, hashPassword, verifyPassword } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,6 +31,12 @@ export async function POST(req: NextRequest) {
   await prisma.user.update({
     where: { id: user.id },
     data: { password: await hashPassword(newPassword) },
+  });
+
+  await logAudit({
+    action: "user.password_change",
+    summary: `Trocou a própria senha`,
+    req,
   });
 
   return NextResponse.json({ ok: true });

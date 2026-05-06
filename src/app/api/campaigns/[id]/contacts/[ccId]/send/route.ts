@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sendText, sendMedia } from "@/lib/evolution";
 import { resolveTemplate, buildVarContext, ensureAutoTag, recordOutgoingInConversation } from "@/lib/campaigns";
 import { broadcast } from "@/lib/sse";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string;
     });
 
     broadcast("campaigns", { action: "sent", id: params.id });
+
+    await logAudit({
+      action: "campaign.send",
+      entity: "Campaign",
+      entityId: params.id,
+      summary: `Enviou para ${cc.contact.name} (campanha "${campaign.name}")`,
+      meta: { ccId: cc.id, contactId: cc.contactId, phone: cc.contact.phone },
+      req,
+    });
+
     return NextResponse.json({ ok: true, message: finalMessage });
   } catch (e: any) {
     // Marca como FALHOU + tag automática pra facilitar filtrar depois

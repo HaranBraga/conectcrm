@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sendText } from "@/lib/evolution";
 import { resolveTemplate, recordOutgoingInConversation } from "@/lib/campaigns";
 import { broadcast } from "@/lib/sse";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -68,5 +69,15 @@ export async function POST(req: NextRequest) {
   });
 
   broadcast("birthdays", { action: "sent", contactId });
+
+  await logAudit({
+    action: "birthday.send",
+    entity: "Contact",
+    entityId: contactId,
+    summary: `Enviou aniversário para ${contact.name}`,
+    meta: { phone: contact.phone, year },
+    req,
+  });
+
   return NextResponse.json({ ok: true, message: finalMessage });
 }

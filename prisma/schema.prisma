@@ -205,8 +205,35 @@ model User {
   updatedAt DateTime  @updatedAt
 
   contactNotes ContactNote[]
+  auditLogs    AuditLog[]
 
   @@index([username])
+}
+
+/**
+ * Log de auditoria — registra ações relevantes do sistema.
+ * Não é exaustivo: foca em CRUD de entidades importantes (users, contatos,
+ * campanhas, demandas), envios (campanha/aniversário) e auth (login, troca
+ * de senha). Admin consulta em /configuracoes → aba Logs.
+ */
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userName  String?  // snapshot do nome (sobrevive à exclusão do user)
+  action    String   // ex: "user.login", "contact.create", "campaign.send"
+  entity    String?  // ex: "Contact", "Campaign", "User"
+  entityId  String?
+  summary   String?  // texto curto exibido na UI
+  meta      Json?    // payload extra (campos alterados, contagens, etc)
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([entity, entityId])
+  @@index([createdAt])
 }
 
 model Demanda {

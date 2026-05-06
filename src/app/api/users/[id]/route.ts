@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -50,15 +51,39 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     data,
     select: { id: true, name: true, username: true, isAdmin: true, modules: true, active: true, lastLogin: true },
   });
+
+  await logAudit({
+    action: "user.update",
+    entity: "User",
+    entityId: updated.id,
+    summary: `Atualizou usuário "${updated.name}"`,
+    meta: {
+      changedFields: Object.keys(data).filter(k => k !== "password"),
+      passwordChanged: !!data.password,
+    },
+    req,
+  });
+
   return NextResponse.json(updated);
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const { error, user: actor } = await requireAdminOrError();
   if (error) return error;
   if (actor!.id === params.id) {
     return NextResponse.json({ error: "Você não pode excluir você mesmo" }, { status: 400 });
   }
+  const target = await prisma.user.findUnique({ where: { id: params.id }, select: { name: true, username: true } });
   await prisma.user.delete({ where: { id: params.id } });
+
+  await logAudit({
+    action: "user.delete",
+    entity: "User",
+    entityId: params.id,
+    summary: `Excluiu usuário "${target?.name ?? params.id}"`,
+    meta: { username: target?.username ?? null },
+    req,
+  });
+
   return NextResponse.json({ ok: true });
 }

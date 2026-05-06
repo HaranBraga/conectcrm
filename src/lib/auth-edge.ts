@@ -20,7 +20,7 @@ function getSecret(): Uint8Array {
   return new TextEncoder().encode(raw || "dev-secret-change-me-in-production");
 }
 
-export type SessionPayload = { uid: string; isAdmin: boolean };
+export type SessionPayload = { uid: string; isAdmin: boolean; modules: string[] };
 
 /** Cria token JWT de sessão (Edge-compatible — usa jose). */
 export async function signSession(payload: SessionPayload): Promise<string> {

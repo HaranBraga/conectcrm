@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -55,5 +56,15 @@ export async function POST(req: NextRequest) {
     },
     select: { id: true, name: true, username: true, isAdmin: true, modules: true, active: true, createdAt: true },
   });
+
+  await logAudit({
+    action: "user.create",
+    entity: "User",
+    entityId: user.id,
+    summary: `Criou usuário "${user.name}" (@${user.username})`,
+    meta: { isAdmin: user.isAdmin, modules: user.modules, active: user.active },
+    req,
+  });
+
   return NextResponse.json(user, { status: 201 });
 }

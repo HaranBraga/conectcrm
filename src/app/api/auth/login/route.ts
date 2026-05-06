@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword, signSession, SESSION_COOKIE } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,17 +29,42 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({ where: { username: uname } });
     if (!user || !user.active) {
+      await logAudit({
+        action: "user.login_failed",
+        user: null,
+        summary: `Tentativa de login com usuário "${uname}"`,
+        meta: { username: uname, reason: user ? "inactive" : "not_found" },
+        req,
+      });
       return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
     }
 
     const ok = await verifyPassword(password, user.password);
     if (!ok) {
+      await logAudit({
+        action: "user.login_failed",
+        user: { id: user.id, name: user.name },
+        summary: `Senha incorreta para "${uname}"`,
+        meta: { username: uname, reason: "wrong_password" },
+        req,
+      });
       return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
     }
 
     await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
 
-    const token = await signSession({ uid: user.id, isAdmin: user.isAdmin });
+    await logAudit({
+      action: "user.login",
+      user: { id: user.id, name: user.name },
+      summary: `Login efetuado por @${uname}`,
+      req,
+    });
+
+    const token = await signSession({
+      uid: user.id,
+      isAdmin: user.isAdmin,
+      modules: user.modules ?? [],
+    });
 
     const res = NextResponse.json({
       user: { id: user.id, name: user.name, username: user.username, isAdmin: user.isAdmin, modules: user.modules },

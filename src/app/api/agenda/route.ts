@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcast } from "@/lib/sse";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -58,5 +59,15 @@ export async function POST(req: NextRequest) {
     include,
   });
   broadcast("agenda", { action: "created", id: evento.id });
+
+  await logAudit({
+    action: "agenda.create",
+    entity: "AgendaEvento",
+    entityId: evento.id,
+    summary: `Criou evento "${evento.titulo}"`,
+    meta: { inicio: evento.inicio, tipo: evento.tipo },
+    req,
+  });
+
   return NextResponse.json(evento, { status: 201 });
 }

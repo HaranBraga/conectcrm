@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sendText, sendMedia } from "@/lib/evolution";
 import { resolveTemplate, buildVarContext, getMissingVariables, ensureAutoTag, recordOutgoingInConversation } from "@/lib/campaigns";
 import { broadcast } from "@/lib/sse";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const interval = Math.max(500, Number(delayMs) || campaign.defaultDelayMs || 2000);
   const ids = pendentes.map(p => p.id);
+
+  // Log no início (loop é fire-and-forget — registramos a intenção)
+  await logAudit({
+    action: "campaign.batch_send",
+    entity: "Campaign",
+    entityId: params.id,
+    summary: `Iniciou envio em lote de ${pendentes.length} contato(s) — campanha "${campaign.name}"`,
+    meta: { count: pendentes.length, delayMs: interval, assignedToId: assignedToId ?? null },
+    req,
+  });
 
   // Marca como SENDING (status intermediário) — usamos a coluna status
   // Convenção: enquanto enviando, mantém PENDENTE pra evitar perder se der pau no servidor.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcast } from "@/lib/sse";
 import { resolveContactIds } from "@/lib/reunioes";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -66,12 +67,32 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     include,
   });
   broadcast("reunioes", { action: "updated" });
+
+  await logAudit({
+    action: "reuniao.update",
+    entity: "Reuniao",
+    entityId: reuniao.id,
+    summary: `Atualizou reunião "${reuniao.titulo}"`,
+    meta: { changedFields: Object.keys(body) },
+    req,
+  });
+
   return NextResponse.json(reuniao);
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const target = await prisma.reuniao.findUnique({ where: { id: params.id }, select: { titulo: true } });
   await prisma.reuniao.delete({ where: { id: params.id } });
   broadcast("reunioes", { action: "deleted" });
+
+  await logAudit({
+    action: "reuniao.delete",
+    entity: "Reuniao",
+    entityId: params.id,
+    summary: `Excluiu reunião "${target?.titulo ?? params.id}"`,
+    req,
+  });
+
   return NextResponse.json({ ok: true });
 }
 

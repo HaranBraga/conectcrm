@@ -47,3 +47,16 @@ export async function requireAdmin(): Promise<CurrentUser> {
   if (!u.isAdmin) redirect("/");
   return u;
 }
+
+/**
+ * Garante que o usuário atual tem acesso ao módulo (lê User do banco — sempre
+ * atualizado, ao contrário do middleware que confia no JWT). Use em layouts
+ * server-side ou rotas API com mutações sensíveis quando quiser garantir
+ * que mudanças de permissão por admin surtem efeito imediato.
+ */
+export async function requireModule(moduleKey: string): Promise<CurrentUser> {
+  const u = await requireUser();
+  if (u.isAdmin) return u;
+  if (!u.modules.includes(moduleKey)) redirect("/");
+  return u;
+}

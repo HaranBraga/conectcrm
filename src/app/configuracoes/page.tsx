@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Plus, Trash2, Edit2, Tags, Layout, Briefcase, Calendar, ClipboardList,
   Users as UsersIcon, KeyRound, ShieldCheck, Search, Eye, EyeOff,
+  History, Filter, X,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { type PersonRole } from "@/components/ui/RoleBadge";
@@ -276,6 +277,254 @@ function UserForm({ initial, onSave, onClose }: { initial?: any; onSave: () => v
   );
 }
 
+// ─── Audit Logs panel ────────────────────────────────────────────────────────
+
+const ACTION_GROUPS: { label: string; prefix?: string; action?: string }[] = [
+  { label: "Tudo" },
+  { label: "Login",       prefix: "user.login" },
+  { label: "Usuários",    prefix: "user." },
+  { label: "Contatos",    prefix: "contact." },
+  { label: "Campanhas",   prefix: "campaign." },
+  { label: "Aniversários", prefix: "birthday." },
+  { label: "Demandas",    prefix: "demanda." },
+  { label: "Reuniões",    prefix: "reuniao." },
+  { label: "Agenda",      prefix: "agenda." },
+  { label: "Kanban",      prefix: "kanban." },
+];
+
+const ACTION_FRIENDLY: Record<string, string> = {
+  "user.login":           "Login",
+  "user.login_failed":    "Falha de login",
+  "user.logout":          "Logout",
+  "user.password_change": "Trocou a senha",
+  "user.create":          "Criou usuário",
+  "user.update":          "Atualizou usuário",
+  "user.delete":          "Excluiu usuário",
+  "contact.create":       "Criou contato",
+  "contact.update":       "Atualizou contato",
+  "contact.delete":       "Excluiu contato",
+  "campaign.create":      "Criou campanha",
+  "campaign.update":      "Atualizou campanha",
+  "campaign.delete":      "Excluiu campanha",
+  "campaign.send":        "Enviou (campanha)",
+  "campaign.batch_send":  "Envio em lote",
+  "birthday.send":        "Enviou aniversário",
+  "demanda.create":       "Criou demanda",
+  "demanda.update":       "Atualizou demanda",
+  "demanda.delete":       "Excluiu demanda",
+  "reuniao.create":       "Criou reunião",
+  "reuniao.update":       "Atualizou reunião",
+  "reuniao.delete":       "Excluiu reunião",
+  "agenda.create":        "Criou evento",
+  "agenda.update":        "Atualizou evento",
+  "agenda.delete":        "Excluiu evento",
+  "kanban.move":          "Moveu card no kanban",
+  "config.update":        "Mudou config",
+};
+
+function actionColor(action: string): string {
+  if (action.endsWith(".delete") || action === "user.login_failed") return "bg-red-50 text-red-700 border-red-200";
+  if (action.endsWith(".create") || action === "user.login")        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+  if (action.endsWith(".update"))                                   return "bg-blue-50 text-blue-700 border-blue-200";
+  if (action.endsWith(".send") || action.endsWith(".batch_send"))   return "bg-violet-50 text-violet-700 border-violet-200";
+  return "bg-gray-50 text-gray-700 border-gray-200";
+}
+
+function fmtDateTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function AuditLogsPanel({ users }: { users: any[] }) {
+  const [logs, setLogs]     = useState<any[]>([]);
+  const [total, setTotal]   = useState(0);
+  const [page, setPage]     = useState(1);
+  const [loading, setLoading] = useState(false);
+
+  // filtros
+  const [userId, setUserId]       = useState("");
+  const [groupIdx, setGroupIdx]   = useState(0);   // 0 = Tudo
+  const [search, setSearch]       = useState("");
+  const [dateFrom, setDateFrom]   = useState("");
+  const [dateTo, setDateTo]       = useState("");
+
+  const [openMeta, setOpenMeta] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      if (userId)            qs.set("userId", userId);
+      const grp = ACTION_GROUPS[groupIdx];
+      if (grp.prefix && groupIdx !== 0) qs.set("actionPrefix", grp.prefix);
+      if (grp.action)        qs.set("action", grp.action);
+      if (search.trim())     qs.set("search", search.trim());
+      if (dateFrom)          qs.set("dateFrom", new Date(dateFrom).toISOString());
+      if (dateTo)            qs.set("dateTo",   new Date(dateTo + "T23:59:59").toISOString());
+      qs.set("page", String(page));
+      qs.set("limit", "50");
+
+      const r = await fetch("/api/audit-logs?" + qs.toString());
+      if (!r.ok) { toast.error("Erro ao buscar logs"); return; }
+      const d = await r.json();
+      setLogs(d.logs);
+      setTotal(d.total);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, groupIdx, search, dateFrom, dateTo, page]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function clearFilters() {
+    setUserId(""); setGroupIdx(0); setSearch(""); setDateFrom(""); setDateTo(""); setPage(1);
+  }
+
+  const hasFilters = !!(userId || groupIdx !== 0 || search || dateFrom || dateTo);
+  const pages = Math.max(1, Math.ceil(total / 50));
+
+  return (
+    <section>
+      <SectionHeader
+        title="Logs de Auditoria"
+        description="Histórico de ações realizadas no sistema — útil pra rastrear quem fez o quê e quando"
+      />
+
+      {/* Filtros */}
+      <div className="bg-white border border-gray-200 rounded-xl p-3 mb-3 flex flex-wrap items-end gap-2">
+        <div className="flex-1 min-w-[180px]">
+          <label className="block text-[11px] font-medium text-gray-500 mb-1">Buscar</label>
+          <div className="relative">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Texto na descrição..."
+              className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-medium text-gray-500 mb-1">Usuário</label>
+          <select
+            value={userId}
+            onChange={e => { setUserId(e.target.value); setPage(1); }}
+            className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+          >
+            <option value="">Todos</option>
+            {users.map((u: any) => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-medium text-gray-500 mb-1">Tipo</label>
+          <select
+            value={groupIdx}
+            onChange={e => { setGroupIdx(Number(e.target.value)); setPage(1); }}
+            className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+          >
+            {ACTION_GROUPS.map((g, i) => <option key={i} value={i}>{g.label}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-medium text-gray-500 mb-1">De</label>
+          <input
+            type="date" value={dateFrom}
+            onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-medium text-gray-500 mb-1">Até</label>
+          <input
+            type="date" value={dateTo}
+            onChange={e => { setDateTo(e.target.value); setPage(1); }}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+        </div>
+
+        {hasFilters && (
+          <button onClick={clearFilters} className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
+            <X size={12} /> Limpar
+          </button>
+        )}
+      </div>
+
+      <div className="text-xs text-gray-400 mb-2">
+        {loading ? "Carregando..." : `${total} registro(s)`}
+      </div>
+
+      {/* Lista */}
+      <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+        {!loading && logs.length === 0 && (
+          <p className="py-12 text-center text-gray-400 text-sm">Nenhum log encontrado</p>
+        )}
+        {logs.map(l => {
+          const friendly = ACTION_FRIENDLY[l.action] ?? l.action;
+          const expanded = openMeta === l.id;
+          return (
+            <div key={l.id} className="px-4 py-3">
+              <div className="flex items-start gap-3">
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${actionColor(l.action)}`}>
+                  {friendly}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-800 truncate">{l.summary ?? "—"}</p>
+                  <p className="text-[11px] text-gray-400 flex items-center gap-2 mt-0.5">
+                    <span className="font-medium text-gray-500">{l.userName ?? "—"}</span>
+                    <span>·</span>
+                    <span>{fmtDateTime(l.createdAt)}</span>
+                    {l.ipAddress && <><span>·</span><span className="font-mono text-gray-400">{l.ipAddress}</span></>}
+                  </p>
+                </div>
+                {l.meta && (
+                  <button
+                    onClick={() => setOpenMeta(expanded ? null : l.id)}
+                    className="text-[11px] text-gray-400 hover:text-gray-600 px-2 py-1 rounded hover:bg-gray-50"
+                  >
+                    {expanded ? "Esconder" : "Detalhes"}
+                  </button>
+                )}
+              </div>
+              {expanded && l.meta && (
+                <pre className="mt-2 text-[11px] bg-gray-50 border border-gray-100 rounded-lg p-2 overflow-auto text-gray-600">
+                  {JSON.stringify(l.meta, null, 2)}
+                </pre>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Paginação */}
+      {pages > 1 && (
+        <div className="flex items-center justify-between mt-3 text-sm">
+          <button
+            disabled={page <= 1}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+          >
+            ← Anterior
+          </button>
+          <span className="text-xs text-gray-500">Página {page} de {pages}</span>
+          <button
+            disabled={page >= pages}
+            onClick={() => setPage(p => Math.min(pages, p + 1))}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+          >
+            Próxima →
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ─── Tabs ────────────────────────────────────────────────────────────────────
 
 const TABS = [
@@ -285,6 +534,7 @@ const TABS = [
   { key: "etiquetas",   label: "Etiquetas",    icon: Tags        },
   { key: "calendarios", label: "Calendários",  icon: Calendar    },
   { key: "usuarios",    label: "Usuários",     icon: UsersIcon   },
+  { key: "logs",        label: "Logs",         icon: History     },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -454,6 +704,10 @@ export default function ConfiguracoesPage() {
                   ))}
                 </div>
               </section>
+            )}
+
+            {tab === "logs" && (
+              <AuditLogsPanel users={users} />
             )}
 
             {tab === "usuarios" && (

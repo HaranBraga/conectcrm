@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logAudit } from "@/lib/audit";
 
 const roleSelect = { select: { id: true, key: true, label: true, color: true, bgColor: true, level: true } };
 
@@ -43,10 +44,31 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     },
     include: { role: roleSelect },
   });
+
+  await logAudit({
+    action: "contact.update",
+    entity: "Contact",
+    entityId: contact.id,
+    summary: `Atualizou contato "${contact.name}"`,
+    meta: { changedFields: Object.keys(body) },
+    req,
+  });
+
   return NextResponse.json(contact);
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const target = await prisma.contact.findUnique({ where: { id: params.id }, select: { name: true, phone: true } });
   await prisma.contact.delete({ where: { id: params.id } });
+
+  await logAudit({
+    action: "contact.delete",
+    entity: "Contact",
+    entityId: params.id,
+    summary: `Excluiu contato "${target?.name ?? params.id}"`,
+    meta: { phone: target?.phone ?? null },
+    req,
+  });
+
   return NextResponse.json({ ok: true });
 }

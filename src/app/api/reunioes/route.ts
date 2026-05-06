@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcast } from "@/lib/sse";
 import { resolveContactIds } from "@/lib/reunioes";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -70,5 +71,15 @@ export async function POST(req: NextRequest) {
     include,
   });
   broadcast("reunioes", { action: "created" });
+
+  await logAudit({
+    action: "reuniao.create",
+    entity: "Reuniao",
+    entityId: reuniao.id,
+    summary: `Criou reunião "${reuniao.titulo}"`,
+    meta: { dataHora: reuniao.dataHora, presentes: uniqPresIds.length, anfitrioes: uniqAnfIds.length },
+    req,
+  });
+
   return NextResponse.json(reuniao, { status: 201 });
 }

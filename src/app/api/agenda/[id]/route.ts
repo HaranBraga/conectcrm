@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcast } from "@/lib/sse";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     include,
   });
   broadcast("agenda", { action: "updated", id: params.id });
+
+  await logAudit({
+    action: "agenda.update",
+    entity: "AgendaEvento",
+    entityId: evento.id,
+    summary: `Atualizou evento "${evento.titulo}"`,
+    meta: { changedFields: Object.keys(body) },
+    req,
+  });
+
   return NextResponse.json(evento);
 }
 
@@ -72,11 +83,31 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     include,
   });
   broadcast("agenda", { action: "updated", id: params.id });
+
+  await logAudit({
+    action: "agenda.update",
+    entity: "AgendaEvento",
+    entityId: evento.id,
+    summary: `Mudou status do evento "${evento.titulo}" → ${status}`,
+    meta: { status },
+    req,
+  });
+
   return NextResponse.json(evento);
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const target = await prisma.agendaEvento.findUnique({ where: { id: params.id }, select: { titulo: true } });
   await prisma.agendaEvento.delete({ where: { id: params.id } });
   broadcast("agenda", { action: "deleted", id: params.id });
+
+  await logAudit({
+    action: "agenda.delete",
+    entity: "AgendaEvento",
+    entityId: params.id,
+    summary: `Excluiu evento "${target?.titulo ?? params.id}"`,
+    req,
+  });
+
   return NextResponse.json({ ok: true });
 }

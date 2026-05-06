@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logAudit } from "@/lib/audit";
 
 const roleSelect = { select: { id: true, key: true, label: true, color: true, bgColor: true, level: true } };
 
@@ -62,6 +63,15 @@ export async function POST(req: NextRequest) {
       genero, rua, bairro, cidade, zona,
     },
     include: { role: roleSelect },
+  });
+
+  await logAudit({
+    action: "contact.create",
+    entity: "Contact",
+    entityId: contact.id,
+    summary: `Criou contato "${contact.name}"`,
+    meta: { phone: contact.phone, role: contact.role?.label ?? null },
+    req,
   });
 
   return NextResponse.json(contact, { status: 201 });

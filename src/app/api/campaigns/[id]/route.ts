@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcast } from "@/lib/sse";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -45,11 +46,31 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     include: { responseTags: { orderBy: { order: "asc" } } },
   });
   broadcast("campaigns", { action: "updated", id: params.id });
+
+  await logAudit({
+    action: "campaign.update",
+    entity: "Campaign",
+    entityId: campaign.id,
+    summary: `Atualizou campanha "${campaign.name}"`,
+    meta: { changedFields: Object.keys(body) },
+    req,
+  });
+
   return NextResponse.json(campaign);
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const target = await prisma.campaign.findUnique({ where: { id: params.id }, select: { name: true } });
   await prisma.campaign.delete({ where: { id: params.id } });
   broadcast("campaigns", { action: "deleted", id: params.id });
+
+  await logAudit({
+    action: "campaign.delete",
+    entity: "Campaign",
+    entityId: params.id,
+    summary: `Excluiu campanha "${target?.name ?? params.id}"`,
+    req,
+  });
+
   return NextResponse.json({ ok: true });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcast } from "@/lib/sse";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -41,11 +42,31 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     include,
   });
   broadcast("demandas", { action: "updated", id: params.id });
+
+  await logAudit({
+    action: "demanda.update",
+    entity: "Demanda",
+    entityId: demanda.id,
+    summary: `Atualizou demanda "${demanda.titulo}"`,
+    meta: { changedFields: Object.keys(body), status: demanda.status },
+    req,
+  });
+
   return NextResponse.json(demanda);
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const target = await prisma.demanda.findUnique({ where: { id: params.id }, select: { titulo: true } });
   await prisma.demanda.delete({ where: { id: params.id } });
   broadcast("demandas", { action: "deleted", id: params.id });
+
+  await logAudit({
+    action: "demanda.delete",
+    entity: "Demanda",
+    entityId: params.id,
+    summary: `Excluiu demanda "${target?.titulo ?? params.id}"`,
+    req,
+  });
+
   return NextResponse.json({ ok: true });
 }
