@@ -1,6 +1,82 @@
 import { prisma } from "@/lib/prisma";
 
 /**
+ * Após um envio bem-sucedido (campanha, reunião, aniversário), garante
+ * que o contato vira "message" (aparece no kanban), tem uma Conversation
+ * aberta, e registra a Message OUT — assim o disparo aparece em Conversas.
+ *
+ * Dedupe: se whatsappMsgId for fornecido e o webhook do Evolution já
+ * criou a mensagem antes, não duplica.
+ */
+export async function recordOutgoingInConversation(opts: {
+  contactId: string;
+  content: string;
+  mediaType?: string | null;
+  whatsappMsgId?: string;
+  broadcaster?: (channel: string, data: any) => void;
+}) {
+  const { contactId, content, mediaType, whatsappMsgId, broadcaster } = opts;
+  try {
+    // 1) Source = message + atualiza lastContact
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: { source: "message", lastContactAt: new Date(), lastMessage: content },
+    });
+
+    // 2) Garante conversa aberta
+    let conv = await prisma.conversation.findUnique({ where: { contactId } });
+    if (conv?.closedAt) {
+      conv = await prisma.conversation.update({
+        where: { id: conv.id },
+        data: { closedAt: null, lastMessageAt: new Date(), lastMessageText: content },
+      });
+    } else if (conv) {
+      conv = await prisma.conversation.update({
+        where: { id: conv.id },
+        data: { lastMessageAt: new Date(), lastMessageText: content },
+      });
+    } else {
+      const firstStatus = await prisma.kanbanStatus.findFirst({ orderBy: { position: "asc" } });
+      if (firstStatus) {
+        conv = await prisma.conversation.create({
+          data: {
+            contactId,
+            statusId: firstStatus.id,
+            lastMessageAt: new Date(),
+            lastMessageText: content,
+          },
+        });
+      }
+    }
+    if (!conv) return;
+
+    // 3) Cria Message OUT (com dedup pelo whatsappMsgId, caso o webhook chegue depois)
+    if (whatsappMsgId) {
+      const exists = await prisma.message.findFirst({ where: { whatsappMsgId } });
+      if (exists) return;
+    }
+    await prisma.message.create({
+      data: {
+        conversationId: conv.id,
+        content,
+        direction: "OUT",
+        whatsappMsgId: whatsappMsgId ?? null,
+        mediaType: mediaType ?? null,
+      },
+    });
+
+    // 4) Notifica UI (kanban + conversa)
+    if (broadcaster) {
+      broadcaster("kanban",   { action: "message" });
+      broadcaster("mensagem", { conversationId: conv.id });
+    }
+  } catch (err) {
+    // Não falhamos o disparo por causa disso — apenas logamos.
+    console.error("[recordOutgoingInConversation]", err);
+  }
+}
+
+/**
  * Garante que uma tag automática existe na campanha — usada pra marcar
  * envios que falharam ou foram ignorados (variável faltando), facilitando
  * o filtro depois. Find-or-create por label.

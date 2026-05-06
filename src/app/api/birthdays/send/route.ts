@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendText } from "@/lib/evolution";
-import { resolveTemplate } from "@/lib/campaigns";
+import { resolveTemplate, recordOutgoingInConversation } from "@/lib/campaigns";
 import { broadcast } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
@@ -46,22 +46,26 @@ export async function POST(req: NextRequest) {
   };
   const finalMessage = resolveTemplate(template, ctx);
 
+  let result: any;
   try {
-    await sendText(contact.phone, finalMessage);
+    result = await sendText(contact.phone, finalMessage);
   } catch (e: any) {
     const detail = e?.response?.data?.message ?? e?.message ?? "erro desconhecido";
     return NextResponse.json({ error: `Falha no envio: ${detail}` }, { status: 502 });
   }
+  const whatsappMsgId: string | undefined = result?.key?.id;
 
-  await prisma.$transaction([
-    prisma.birthdayMessage.create({
-      data: { contactId, year, message: finalMessage },
-    }),
-    prisma.contact.update({
-      where: { id: contactId },
-      data: { lastContactAt: new Date(), lastMessage: finalMessage },
-    }),
-  ]);
+  await prisma.birthdayMessage.create({
+    data: { contactId, year, message: finalMessage },
+  });
+
+  // Garante presença no Kanban + registra mensagem na conversa
+  await recordOutgoingInConversation({
+    contactId,
+    content: finalMessage,
+    whatsappMsgId,
+    broadcaster: broadcast,
+  });
 
   broadcast("birthdays", { action: "sent", contactId });
   return NextResponse.json({ ok: true, message: finalMessage });

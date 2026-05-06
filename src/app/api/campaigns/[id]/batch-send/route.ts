@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendText, sendMedia } from "@/lib/evolution";
-import { resolveTemplate, buildVarContext, getMissingVariables, ensureAutoTag } from "@/lib/campaigns";
+import { resolveTemplate, buildVarContext, getMissingVariables, ensureAutoTag, recordOutgoingInConversation } from "@/lib/campaigns";
 import { broadcast } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
@@ -67,22 +67,34 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         }
 
         const finalMessage = resolveTemplate(campaign.messageTemplate, ctx);
+        let result: any;
+        let savedMediaType: string | null = null;
         if (campaign.mediaUrl && campaign.mediaType) {
           const caption = campaign.linkUrl ? `${finalMessage}\n\n${campaign.linkUrl}` : finalMessage;
-          await sendMedia(cc.contact.phone, campaign.mediaUrl, campaign.mediaType as "image" | "video", caption);
+          result = await sendMedia(cc.contact.phone, campaign.mediaUrl, campaign.mediaType as "image" | "video", caption);
+          savedMediaType = campaign.mediaType;
         } else if (campaign.linkUrl) {
-          await sendText(cc.contact.phone, `${finalMessage}\n\n${campaign.linkUrl}`);
+          result = await sendText(cc.contact.phone, `${finalMessage}\n\n${campaign.linkUrl}`);
         } else {
-          await sendText(cc.contact.phone, finalMessage);
+          result = await sendText(cc.contact.phone, finalMessage);
         }
+        const whatsappMsgId: string | undefined = result?.key?.id;
+
         await prisma.campaignContact.update({
           where: { id: cc.id },
           data: { status: "ENVIADO", sentAt: new Date(), sentById: sentById || null, sentMessage: finalMessage },
         });
-        await prisma.contact.update({
-          where: { id: cc.contactId },
-          data: { lastContactAt: new Date(), lastMessage: finalMessage },
+
+        // Garante que o contato apareça no Kanban e que a mensagem
+        // entre no histórico de Conversas
+        await recordOutgoingInConversation({
+          contactId: cc.contactId,
+          content: finalMessage,
+          mediaType: savedMediaType,
+          whatsappMsgId,
+          broadcaster: broadcast,
         });
+
         broadcast("campaigns", { action: "sent", id: params.id, ccId: cc.id });
       } catch (e: any) {
         // Marca como FALHOU (processado com erro) — conta no resumo e

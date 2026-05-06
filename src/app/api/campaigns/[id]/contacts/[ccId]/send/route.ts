@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendText, sendMedia } from "@/lib/evolution";
-import { resolveTemplate, buildVarContext, ensureAutoTag } from "@/lib/campaigns";
+import { resolveTemplate, buildVarContext, ensureAutoTag, recordOutgoingInConversation } from "@/lib/campaigns";
 import { broadcast } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
@@ -29,14 +29,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string;
   const finalMessage = resolveTemplate(template, ctx);
 
   try {
+    let result: any;
+    let savedMediaType: string | null = null;
     if (campaign.mediaUrl && campaign.mediaType) {
       const caption = campaign.linkUrl ? `${finalMessage}\n\n${campaign.linkUrl}` : finalMessage;
-      await sendMedia(cc.contact.phone, campaign.mediaUrl, campaign.mediaType as "image" | "video", caption);
+      result = await sendMedia(cc.contact.phone, campaign.mediaUrl, campaign.mediaType as "image" | "video", caption);
+      savedMediaType = campaign.mediaType;
     } else if (campaign.linkUrl) {
-      await sendText(cc.contact.phone, `${finalMessage}\n\n${campaign.linkUrl}`);
+      result = await sendText(cc.contact.phone, `${finalMessage}\n\n${campaign.linkUrl}`);
     } else {
-      await sendText(cc.contact.phone, finalMessage);
+      result = await sendText(cc.contact.phone, finalMessage);
     }
+    const whatsappMsgId: string | undefined = result?.key?.id;
 
     await prisma.campaignContact.update({
       where: { id: cc.id },
@@ -48,9 +52,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string;
       },
     });
 
-    await prisma.contact.update({
-      where: { id: cc.contactId },
-      data: { lastContactAt: new Date(), lastMessage: finalMessage },
+    // Garante presença no Kanban e mensagem registrada na Conversa
+    await recordOutgoingInConversation({
+      contactId: cc.contactId,
+      content: finalMessage,
+      mediaType: savedMediaType,
+      whatsappMsgId,
+      broadcaster: broadcast,
     });
 
     broadcast("campaigns", { action: "sent", id: params.id });
