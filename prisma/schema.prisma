@@ -46,11 +46,17 @@ model Contact {
   name            String
   phone           String     @unique
   email           String?
+  // Slug público usado no minha-rede (link.azecode.cloud) pra montar URLs
+  // tipo /?lider=mario, /?coord=joao. Gerado a partir do nome.
+  publicSlug      String?    @unique
   roleId          String
   role            PersonRole @relation(fields: [roleId], references: [id])
   parentId        String?
   parent          Contact?   @relation("Hierarchy", fields: [parentId], references: [id])
   children        Contact[]  @relation("Hierarchy")
+  // Usuário (login) ligado a este contato — quando alguém da rede tem acesso
+  // ao sistema (ex: coordenador, líder), aponta aqui. Apoiador normalmente fica null.
+  user            User?
 
   dataNascimento  DateTime?
   genero          String?
@@ -203,6 +209,11 @@ model User {
   lastLogin DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
+  // Vinculo opcional a um Contact — usado no minha-rede pra saber qual
+  // ramo da rede esse user controla (descendentes via parentId).
+  contactId String?  @unique
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
   contactNotes ContactNote[]
   auditLogs    AuditLog[]
