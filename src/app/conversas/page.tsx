@@ -51,7 +51,9 @@ function NewContactModal({ phone, name, onSave, onClose }: any) {
   async function save(e: React.FormEvent) {
     e.preventDefault(); setSaving(true);
     try {
-      const r = await fetch("/api/contacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, source: "message" }) });
+      const phoneDigits = form.phone.replace(/\D/g, "");
+      const phone = phoneDigits.startsWith("55") ? phoneDigits : `55${phoneDigits}`;
+      const r = await fetch("/api/contacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, phone, source: "message" }) });
       if (!r.ok) { toast.error((await r.json()).error); return; }
       toast.success("Contato salvo!"); onSave();
     } finally { setSaving(false); }
@@ -64,10 +66,10 @@ function NewContactModal({ phone, name, onSave, onClose }: any) {
         <h3 className="font-semibold text-gray-900 mb-4">Salvar contato</h3>
         <form onSubmit={save} className="flex flex-col gap-3">
           <input required value={form.name} onChange={f("name")} placeholder="Nome *" className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <input required type="tel" inputMode="numeric" pattern="[0-9]*"
+          <input required type="tel" inputMode="numeric" pattern="[0-9]{10,11}" maxLength={11}
             value={form.phone}
-            onChange={(e) => setForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
-            placeholder="Telefone *" className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            onChange={(e) => setForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, "").slice(0, 11) }))}
+            placeholder="Telefone (11 dígitos) *" className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
             <button disabled={saving} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-medium">{saving ? "Salvando..." : "Salvar"}</button>

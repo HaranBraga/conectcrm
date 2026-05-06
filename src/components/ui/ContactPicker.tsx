@@ -117,8 +117,8 @@ export function ContactPicker({ onSelect, placeholder, label }: {
           <div className="flex gap-2">
             <input value={mNome} onChange={e => setMNome(e.target.value)} placeholder="Nome"
               className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            <input type="tel" inputMode="numeric" pattern="[0-9]*"
-              value={mTel} onChange={e => setMTel(e.target.value.replace(/\D/g, ""))} placeholder="Telefone"
+            <input type="tel" inputMode="numeric" pattern="[0-9]{10,11}" maxLength={11}
+              value={mTel} onChange={e => setMTel(e.target.value.replace(/\D/g, "").slice(0, 11))} placeholder="68999551835"
               className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             <button type="button" onClick={commitManual}
               className="bg-brand-600 hover:bg-brand-700 text-white px-3 py-2 rounded-lg text-sm font-medium shrink-0">
