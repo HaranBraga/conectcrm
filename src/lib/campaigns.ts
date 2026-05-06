@@ -1,5 +1,41 @@
 import { prisma } from "@/lib/prisma";
 
+/**
+ * Garante que uma tag automática existe na campanha — usada pra marcar
+ * envios que falharam ou foram ignorados (variável faltando), facilitando
+ * o filtro depois. Find-or-create por label.
+ */
+export async function ensureAutoTag(
+  campaignId: string,
+  kind: "error" | "missing-var",
+): Promise<string> {
+  const presets = {
+    "error":       { label: "Falhou no envio",   color: "#dc2626", bgColor: "#fee2e2" },
+    "missing-var": { label: "Variável faltando", color: "#d97706", bgColor: "#fef3c7" },
+  } as const;
+  const preset = presets[kind];
+
+  const existing = await prisma.campaignResponseTag.findFirst({
+    where: { campaignId, label: preset.label },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+
+  const last = await prisma.campaignResponseTag.findFirst({
+    where: { campaignId }, orderBy: { order: "desc" }, select: { order: true },
+  });
+  const created = await prisma.campaignResponseTag.create({
+    data: {
+      campaignId,
+      label: preset.label,
+      color: preset.color,
+      bgColor: preset.bgColor,
+      order: (last?.order ?? -1) + 1,
+    },
+  });
+  return created.id;
+}
+
 export const CAMPAIGN_VARIABLES = [
   { key: "nome",          label: "Nome completo do contato" },
   { key: "primeiroNome",  label: "Primeiro nome do contato" },

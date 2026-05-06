@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendText, sendMedia } from "@/lib/evolution";
-import { resolveTemplate, buildVarContext } from "@/lib/campaigns";
+import { resolveTemplate, buildVarContext, ensureAutoTag } from "@/lib/campaigns";
 import { broadcast } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +56,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string;
     broadcast("campaigns", { action: "sent", id: params.id });
     return NextResponse.json({ ok: true, message: finalMessage });
   } catch (e: any) {
+    // Marca como FALHOU + tag automática pra facilitar filtrar depois
+    const tagId = await ensureAutoTag(params.id, "error").catch(() => null);
+    await prisma.campaignContact.update({
+      where: { id: cc.id },
+      data: {
+        status: "FALHOU",
+        respondedAt: new Date(),
+        notes: `[Falha no envio]: ${e?.message ?? "erro desconhecido"}`,
+        responseTagId: tagId,
+      },
+    }).catch(() => {});
+    broadcast("campaigns", { action: "send-failed", id: params.id, ccId: cc.id, error: e?.message });
     return NextResponse.json({ error: e?.message ?? "Erro ao enviar" }, { status: 500 });
   }
 }

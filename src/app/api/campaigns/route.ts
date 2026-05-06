@@ -53,13 +53,15 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { name, description, goal, messageTemplate, mediaUrl, mediaType, linkUrl } = body;
   if (!name?.trim()) return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 });
-  if (!messageTemplate?.trim()) return NextResponse.json({ error: "Mensagem é obrigatória" }, { status: 400 });
+  // messageTemplate é opcional na criação — usuário configura depois.
+  // Backend impede envio com template vazio (validação em getMissingVariables / batch-send).
 
   const campaign = await prisma.campaign.create({
     data: {
       name: name.trim(),
       description, goal,
-      messageTemplate, mediaUrl, mediaType, linkUrl,
+      messageTemplate: messageTemplate ?? "",
+      mediaUrl, mediaType, linkUrl,
       responseTags: { create: DEFAULT_TAGS },
     },
     include: { responseTags: true },

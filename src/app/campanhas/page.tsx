@@ -20,7 +20,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
   const [saving, setSaving] = useState(false);
 
   async function save() {
-    if (!name.trim() || !messageTemplate.trim()) { toast.error("Nome e mensagem são obrigatórios"); return; }
+    if (!name.trim()) { toast.error("Nome é obrigatório"); return; }
     setSaving(true);
     try {
       const r = await fetch("/api/campaigns", {
@@ -29,7 +29,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
         body: JSON.stringify({ name, description, goal, messageTemplate }),
       });
       if (!r.ok) { const d = await r.json(); toast.error(d.error ?? "Erro"); return; }
-      toast.success("Campanha criada!");
+      toast.success("Campanha criada! Configure a mensagem e adicione contatos.");
       onCreated(); onClose();
     } finally { setSaving(false); }
   }
@@ -52,15 +52,9 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
           <textarea rows={2} value={description} onChange={e => setDescription(e.target.value)}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none" />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Mensagem padrão *</label>
-          <textarea rows={5} value={messageTemplate} onChange={e => setMessageTemplate(e.target.value)}
-            placeholder="Oi {{primeiroNome}}, aqui é {{primeiroLider}}! ..."
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none font-mono" />
-          <p className="text-xs text-gray-400 mt-1">
-            Variáveis disponíveis: <code>{"{{nome}}"}</code> · <code>{"{{primeiroNome}}"}</code> · <code>{"{{telefone}}"}</code> · <code>{"{{lider}}"}</code> · <code>{"{{primeiroLider}}"}</code>
-          </p>
-          <p className="text-xs text-gray-400 mt-1">Você poderá adicionar mídia, link e tags na tela da campanha.</p>
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700">
+          <p className="font-medium">Mensagem, mídia, link e tags são configurados depois</p>
+          <p className="mt-1">Após criar a campanha, abra-a e vá em <strong>Configuração</strong> pra montar a mensagem com variáveis e mídias.</p>
         </div>
         <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>

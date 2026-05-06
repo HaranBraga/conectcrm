@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendText, sendMedia } from "@/lib/evolution";
-import { resolveTemplate, buildVarContext, getMissingVariables } from "@/lib/campaigns";
+import { resolveTemplate, buildVarContext, getMissingVariables, ensureAutoTag } from "@/lib/campaigns";
 import { broadcast } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
@@ -52,12 +52,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         // Valida que todas as variáveis usadas no template têm valor
         const missing = getMissingVariables(campaign.messageTemplate, ctx);
         if (missing.length > 0) {
+          const tagId = await ensureAutoTag(params.id, "missing-var");
           await prisma.campaignContact.update({
             where: { id: cc.id },
             data: {
               status: "IGNOROU",
               notes: `[Variável faltando]: ${missing.map(v => `{{${v}}}`).join(", ")}`,
               respondedAt: new Date(),
+              responseTagId: tagId,
             },
           });
           broadcast("campaigns", { action: "send-skipped", id: params.id, ccId: cc.id, missing });
@@ -84,13 +86,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         broadcast("campaigns", { action: "sent", id: params.id, ccId: cc.id });
       } catch (e: any) {
         // Marca como FALHOU (processado com erro) — conta no resumo e
-        // pode ser filtrado/reprocessado depois
+        // pode ser filtrado/reprocessado depois. Tag automática facilita
+        // o filtro pelo usuário.
+        const tagId = await ensureAutoTag(params.id, "error");
         await prisma.campaignContact.update({
           where: { id: cc.id },
           data: {
             status: "FALHOU",
             respondedAt: new Date(),
             notes: `[Falha no envio]: ${e?.message ?? "erro desconhecido"}`,
+            responseTagId: tagId,
           },
         });
         broadcast("campaigns", { action: "send-failed", id: params.id, ccId: cc.id, error: e?.message });
