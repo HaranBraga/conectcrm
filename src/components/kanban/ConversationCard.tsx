@@ -3,7 +3,6 @@ import { Draggable } from "@hello-pangea/dnd";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Archive, Clock, MessageSquare, ClipboardList } from "lucide-react";
-import { RoleBadge } from "@/components/ui/RoleBadge";
 import { type LabelDef, getLabelStyle } from "@/components/ui/LabelManager";
 
 interface Props {
@@ -33,20 +32,27 @@ export function ConversationCard({ conversation, index, onClick, onClose, labelD
           onClick={() => onClick(conversation)}
           className={`kanban-card mb-2 ${snapshot.isDragging ? "shadow-lg rotate-1 opacity-90" : ""}`}
         >
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <p className="font-semibold text-gray-900 text-sm leading-tight flex-1 min-w-0 truncate">{contact.name}</p>
-            <div className="flex items-center gap-1 shrink-0">
-              <RoleBadge role={contact.role} />
-              {onClose && (
-                <button
-                  title="Fechar conversa"
-                  onMouseDown={e => e.stopPropagation()}
-                  onClick={e => { e.stopPropagation(); onClose(conversation.id); }}
-                  className="p-0.5 rounded hover:bg-gray-200 text-gray-300 hover:text-gray-600 transition-colors">
-                  <Archive size={12} />
-                </button>
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-gray-900 text-[15px] leading-tight truncate">{contact.name}</p>
+              {contact.role && (
+                <span
+                  className="inline-block mt-0.5 text-[9px] font-medium px-1.5 py-px rounded-full leading-none uppercase tracking-wide"
+                  style={{ color: contact.role.color, backgroundColor: contact.role.bgColor }}
+                >
+                  {contact.role.label}
+                </span>
               )}
             </div>
+            {onClose && (
+              <button
+                title="Fechar conversa"
+                onMouseDown={e => e.stopPropagation()}
+                onClick={e => { e.stopPropagation(); onClose(conversation.id); }}
+                className="p-0.5 rounded hover:bg-gray-200 text-gray-300 hover:text-gray-600 transition-colors shrink-0">
+                <Archive size={12} />
+              </button>
+            )}
           </div>
 
           {contact.lastMessage && (
