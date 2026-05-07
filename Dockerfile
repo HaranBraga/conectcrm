@@ -31,4 +31,4 @@ EXPOSE 3000
 # causa de perda de dados em deploys anteriores. Sem ela, se o schema
 # requer perda de dados, o deploy FALHA e você decide manualmente
 # (backup + migration explícita).
-CMD ["sh", "-c", "npx prisma db push && node scripts/startup.js && npm start"]
+CMD ["sh", "-c", "npx prisma db execute --file ./prisma/migrate-shared.sql --schema ./prisma/schema.prisma && npx prisma db push && node scripts/startup.js && npm start"]
