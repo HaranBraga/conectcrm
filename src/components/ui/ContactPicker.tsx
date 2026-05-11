@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, Plus, X } from "lucide-react";
 import { RoleBadge } from "@/components/ui/RoleBadge";
+import { displayPhone } from "@/lib/phone-display";
 
 export type ContactPickerSelection =
   | { kind: "base"; contact: any }
@@ -87,7 +88,7 @@ export function ContactPicker({ onSelect, placeholder, label }: {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
-                    <p className="text-xs text-gray-400">{c.phone}</p>
+                    <p className="text-xs text-gray-400">{displayPhone(c.phone) ?? ""}</p>
                   </div>
                   {c.role && <RoleBadge role={c.role} />}
                 </button>

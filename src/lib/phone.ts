@@ -9,8 +9,15 @@ export function withBR(phone: string): string {
   return d.startsWith("55") ? d : `55${d}`;
 }
 
-/** Tira o prefixo 55 (pra exibir/editar sem o DDI). */
+/** Tira o prefixo 55 (pra exibir/editar sem o DDI). Retorna "" pra placeholders. */
 export function stripBR(phone: string): string {
+  if (!phone) return "";
+  if (
+    phone.startsWith("placeholder") ||
+    phone.startsWith("cleared-") ||
+    phone.startsWith("import-") ||
+    phone.startsWith("temp-")
+  ) return "";
   const d = onlyDigits(phone);
   return d.startsWith("55") ? d.slice(2) : d;
 }

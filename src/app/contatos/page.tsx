@@ -29,6 +29,9 @@ function withBR(phone: string) {
 // Por baixo, ainda salvamos com 55 prefixado pra manter compat com Evolution
 // e webhook (que recebem mensagens com código país).
 function stripBR(phone: string) {
+  if (!phone) return "";
+  if (phone.startsWith("placeholder") || phone.startsWith("cleared-") ||
+      phone.startsWith("import-") || phone.startsWith("temp-")) return "";
   const d = phone.replace(/\D/g, "");
   return d.startsWith("55") ? d.slice(2) : d;
 }

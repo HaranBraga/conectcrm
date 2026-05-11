@@ -11,6 +11,7 @@ import { Modal } from "@/components/ui/Modal";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
+import { displayPhone } from "@/lib/phone-display";
 
 const MODES = [
   { key: "anfitrioes", label: "Anfitriões",  icon: HomeIcon, color: "amber"  },
@@ -108,7 +109,7 @@ function SendOneModal({ cc, campaign, onClose, onSent }: any) {
     const map: Record<string, string> = {
       nome: cc.contact?.name ?? "",
       primeiroNome: first(cc.contact?.name),
-      telefone: cc.contact?.phone ?? "",
+      telefone: displayPhone(cc.contact?.phone) ?? "",
       lider: cc.assignedTo?.name ?? cc.contact?.parent?.name ?? "",
       primeiroLider: first(cc.assignedTo?.name ?? cc.contact?.parent?.name),
     };
@@ -134,7 +135,7 @@ function SendOneModal({ cc, campaign, onClose, onSent }: any) {
     <Modal open title={`Enviar para ${cc.contact.name}`} onClose={onClose} size="lg">
       <div className="flex flex-col gap-4">
         <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-          <p><strong>Telefone:</strong> {cc.contact.phone}</p>
+          <p><strong>Telefone:</strong> {displayPhone(cc.contact.phone) ?? "—"}</p>
           {(cc.assignedTo?.name || cc.contact?.parent?.name) && (
             <p><strong>Líder:</strong> {cc.assignedTo?.name ?? cc.contact?.parent?.name}</p>
           )}
@@ -179,7 +180,7 @@ function ContactRow({ cc, tags, onSend, onPatch, onDelete }: any) {
           )}
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-400 mt-0.5">
-          <span>{cc.contact.phone}</span>
+          <span>{displayPhone(cc.contact.phone) ?? ""}</span>
           {cc.sentAt && <span>Enviado {format(new Date(cc.sentAt), "dd/MM HH:mm")}</span>}
         </div>
       </div>
@@ -241,7 +242,7 @@ function ParticipantsList({ items, label }: { items: any[]; label: string }) {
         <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
           {items.map((p: any, i: number) => {
             const name  = p.contact?.name ?? p.nome ?? "(sem nome)";
-            const phone = p.contact?.phone ?? p.telefone ?? "";
+            const phone = displayPhone(p.contact?.phone) ?? p.telefone ?? "";
             const initial = (name?.[0] ?? "?").toUpperCase();
             return (
               <div key={p.id ?? p.contactId ?? i} className="flex items-center gap-2 px-3 py-2">

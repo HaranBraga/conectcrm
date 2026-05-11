@@ -44,7 +44,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         if (defaultRole) {
           c = await prisma.contact.create({
             data: {
-              name: solicitanteNome?.trim() || phone,
+              name: (solicitanteNome?.trim() || phone).toUpperCase(),
               phone,
               roleId: defaultRole.id,
               source: "agenda",

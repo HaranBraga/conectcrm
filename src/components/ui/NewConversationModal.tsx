@@ -2,6 +2,7 @@
 import { useState, useRef } from "react";
 import { Search, X } from "lucide-react";
 import toast from "react-hot-toast";
+import { displayPhone } from "@/lib/phone-display";
 
 interface Props {
   onClose: () => void;
@@ -82,7 +83,7 @@ export function NewConversationModal({ onClose, onCreated }: Props) {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
-                  <p className="text-xs text-gray-400">{c.phone}</p>
+                  <p className="text-xs text-gray-400">{displayPhone(c.phone) ?? ""}</p>
                 </div>
                 {selected?.id === c.id && (
                   <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />

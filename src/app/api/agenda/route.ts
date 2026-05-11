@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
         if (defaultRole) {
           c = await prisma.contact.create({
             data: {
-              name: solicitanteNome?.trim() || phone,
+              name: (solicitanteNome?.trim() || phone).toUpperCase(),
               phone,
               roleId: defaultRole.id,
               source: "agenda",

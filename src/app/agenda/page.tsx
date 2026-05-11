@@ -11,6 +11,7 @@ import { ContactPicker } from "@/components/ui/ContactPicker";
 import { format, isSameDay, isToday, addMonths, subMonths, addWeeks, subWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
+import { displayPhone } from "@/lib/phone-display";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -110,7 +111,7 @@ function ContactSearch({ placeholder = "Buscar contato...", onSelect }: {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
-                <p className="text-xs text-gray-400">{c.phone}</p>
+                <p className="text-xs text-gray-400">{displayPhone(c.phone) ?? ""}</p>
               </div>
               {c.role && <RoleBadge role={c.role} />}
             </div>

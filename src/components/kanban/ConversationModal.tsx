@@ -4,6 +4,7 @@ import { Modal } from "@/components/ui/Modal";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { LabelManager, type LabelDef } from "@/components/ui/LabelManager";
 import { Send, Clock, Archive, Paperclip, CheckCheck, FileText, Mic, Image as ImageIcon, Film, Music } from "lucide-react";
+import { displayPhone } from "@/lib/phone-display";
 import { DemandaInline } from "@/components/ui/DemandaInline";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -196,7 +197,7 @@ export function ConversationModal({ conversation, onClose, onCloseConversation, 
             <p className="font-semibold text-gray-900 text-sm truncate">{contact.name}</p>
             {contact.role && <RoleBadge role={contact.role} />}
           </div>
-          <p className="text-xs text-gray-400">{contact.phone}</p>
+          <p className="text-xs text-gray-400">{displayPhone(contact.phone) ?? ""}</p>
         </div>
         <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
           <LabelManager
@@ -207,7 +208,7 @@ export function ConversationModal({ conversation, onClose, onCloseConversation, 
           />
           <DemandaInline
             contactId={conversation.contactId}
-            contactName={conversation.contact?.name ?? conversation.contact?.phone ?? "contato"}
+            contactName={conversation.contact?.name ?? displayPhone(conversation.contact?.phone) ?? "contato"}
             conversaId={conversation.id}
           />
           <button onClick={closeConversation}

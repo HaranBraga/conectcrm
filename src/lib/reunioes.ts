@@ -20,7 +20,7 @@ export async function resolveContactIds(
     if (!contact && defaultRoleId) {
       contact = await prisma.contact.create({
         data: {
-          name: it.nome?.trim() || phone,
+          name: (it.nome?.trim() || phone).toUpperCase(),
           phone,
           roleId: defaultRoleId,
           source: "reuniao",

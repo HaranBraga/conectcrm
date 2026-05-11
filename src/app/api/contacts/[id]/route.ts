@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
+import { upperOrNull } from "@/lib/contact-normalize";
 
 const roleSelect = { select: { id: true, key: true, label: true, color: true, bgColor: true, level: true } };
 
@@ -25,7 +26,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const contact = await prisma.contact.update({
     where: { id: params.id },
     data: {
-      ...(name  && { name }),
+      ...(name  && { name: String(name).trim().toUpperCase() }),
       ...(phone && { phone }),
       ...(email     !== undefined && { email }),
       ...(roleId    && { roleId }),
@@ -34,11 +35,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       ...(source    !== undefined && { source }),
       ...(lastContactAt !== undefined && { lastContactAt: lastContactAt ? new Date(lastContactAt) : null }),
       ...(lastMessage   !== undefined && { lastMessage }),
-      ...(genero    !== undefined && { genero }),
-      ...(rua       !== undefined && { rua }),
-      ...(bairro    !== undefined && { bairro }),
-      ...(cidade    !== undefined && { cidade }),
-      ...(zona      !== undefined && { zona }),
+      ...(genero    !== undefined && { genero: upperOrNull(genero) }),
+      ...(rua       !== undefined && { rua: upperOrNull(rua) }),
+      ...(bairro    !== undefined && { bairro: upperOrNull(bairro) }),
+      ...(cidade    !== undefined && { cidade: upperOrNull(cidade) }),
+      ...(zona      !== undefined && { zona: upperOrNull(zona) }),
       ...(dataNascimento !== undefined && {
         dataNascimento: dataNascimento ? new Date(dataNascimento) : null,
       }),

@@ -10,6 +10,7 @@ import { ContactPicker, type ContactPickerSelection } from "@/components/ui/Cont
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
+import { displayPhone } from "@/lib/phone-display";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,7 +65,7 @@ function ContactSearch({ placeholder = "Buscar contato...", onSelect }: {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
-                <p className="text-xs text-gray-400">{c.phone}</p>
+                <p className="text-xs text-gray-400">{displayPhone(c.phone) ?? ""}</p>
               </div>
               {c.role && <RoleBadge role={c.role} />}
             </div>
@@ -293,8 +294,8 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
                 <span className="text-xs font-medium text-amber-900 truncate max-w-32">
                   {a.contact?.name ?? a.nome ?? "—"}
                 </span>
-                {(a.contact?.phone ?? a.telefone) && (
-                  <span className="text-[10px] text-amber-500">{a.contact?.phone ?? a.telefone}</span>
+                {(displayPhone(a.contact?.phone) ?? a.telefone) && (
+                  <span className="text-[10px] text-amber-500">{displayPhone(a.contact?.phone) ?? a.telefone}</span>
                 )}
                 <button type="button"
                   onClick={() => {
@@ -339,7 +340,7 @@ function ReuniaoForm({ initial, onSave, onClose }: { initial?: any; onSave: (r: 
                   <p className="flex-1 text-xs font-medium text-gray-800 truncate">
                     {p.contact?.name ?? p.nome ?? "—"}
                   </p>
-                  <p className="text-xs text-gray-400">{p.contact?.phone ?? p.telefone ?? ""}</p>
+                  <p className="text-xs text-gray-400">{displayPhone(p.contact?.phone) ?? p.telefone ?? ""}</p>
                   <button type="button" onClick={() => setPresentes(prev => prev.filter(x => x._key !== p._key))}
                     className="text-gray-300 hover:text-red-400"><X size={12} /></button>
                 </div>

@@ -10,6 +10,7 @@ import { Modal } from "@/components/ui/Modal";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
+import { displayPhone } from "@/lib/phone-display";
 
 // ─── ContactSearch ───────────────────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ function ContactSearch({ onSelect, placeholder = "Buscar contato..." }: { onSele
               className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-gray-50">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
-                <p className="text-xs text-gray-400">{c.phone}</p>
+                <p className="text-xs text-gray-400">{displayPhone(c.phone) ?? ""}</p>
               </div>
             </div>
           ))}
@@ -523,7 +524,7 @@ function SendOneModal({ cc, campaign, onClose, onSent }: any) {
     const map: Record<string, string> = {
       nome:          cc.contact?.name ?? "",
       primeiroNome:  first(cc.contact?.name),
-      telefone:      cc.contact?.phone ?? "",
+      telefone:      displayPhone(cc.contact?.phone) ?? "",
       lider:         cc.assignedTo?.name ?? cc.contact?.parent?.name ?? "",
       primeiroLider: first(cc.assignedTo?.name ?? cc.contact?.parent?.name),
     };
@@ -549,7 +550,7 @@ function SendOneModal({ cc, campaign, onClose, onSent }: any) {
     <Modal open title={`Enviar para ${cc.contact.name}`} onClose={onClose} size="lg">
       <div className="flex flex-col gap-4">
         <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-          <p><strong>Telefone:</strong> {cc.contact.phone}</p>
+          <p><strong>Telefone:</strong> {displayPhone(cc.contact.phone) ?? "—"}</p>
           {(cc.assignedTo?.name || cc.contact?.parent?.name) && (
             <p><strong>Líder:</strong> {cc.assignedTo?.name ?? cc.contact?.parent?.name}</p>
           )}
@@ -814,7 +815,7 @@ function ContactRow({ cc, campaign, tags, onSend, onPatch, onDelete }: any) {
           )}
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-400 mt-0.5">
-          <span>{cc.contact.phone}</span>
+          <span>{displayPhone(cc.contact.phone) ?? ""}</span>
           {(cc.assignedTo?.name || cc.contact.parent?.name) && (
             <span>Líder: {cc.assignedTo?.name ?? cc.contact.parent?.name}</span>
           )}
@@ -936,7 +937,7 @@ export default function CampanhaDetailPage() {
 
   const filterFn = (cc: any) => !search.trim() ||
     cc.contact.name?.toLowerCase().includes(search.toLowerCase()) ||
-    cc.contact.phone?.includes(search);
+    (displayPhone(cc.contact.phone) ?? "").includes(search);
 
   if (!campaign) {
     return <div className="flex items-center justify-center h-screen text-gray-400">Carregando...</div>;

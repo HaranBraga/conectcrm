@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
       const defaultRole = await prisma.personRole.findFirst({ orderBy: { level: "desc" } });
       if (!defaultRole) return NextResponse.json({ ok: true });
       contact = await prisma.contact.create({
-        data: { name: pushName || phone, phone, roleId: defaultRole.id, source: "message" },
+        data: { name: (pushName || phone).toUpperCase(), phone, roleId: defaultRole.id, source: "message" },
       });
       if (defaultStatus) {
         await prisma.conversation.create({

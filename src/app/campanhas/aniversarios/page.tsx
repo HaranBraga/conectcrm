@@ -6,6 +6,7 @@ import { RoleBadge } from "@/components/ui/RoleBadge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
+import { displayPhone } from "@/lib/phone-display";
 
 const VARIABLES = [
   { key: "primeiroNome",  label: "Primeiro nome" },
@@ -216,7 +217,7 @@ export default function AniversariosPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-400 mt-0.5">
-                        <span className="flex items-center gap-1"><Phone size={10} />{c.phone}</span>
+                        {displayPhone(c.phone) && <span className="flex items-center gap-1"><Phone size={10} />{displayPhone(c.phone)}</span>}
                         {c.cidade && <span className="flex items-center gap-1"><MapPin size={10} />{c.cidade}</span>}
                         {c.parent && <span>Líder: {c.parent.name}</span>}
                       </div>
@@ -264,7 +265,7 @@ export default function AniversariosPage() {
             <div className="bg-[#dcf8c6] rounded-lg p-3 text-sm text-gray-800 whitespace-pre-wrap mb-4">
               {previewMessage(previewCc) || <span className="text-gray-400 italic">(template vazio)</span>}
             </div>
-            <p className="text-xs text-gray-400 mb-4">Telefone: {previewCc.phone}</p>
+            <p className="text-xs text-gray-400 mb-4">Telefone: {displayPhone(previewCc.phone) ?? "—"}</p>
             <div className="flex justify-end gap-2">
               <button onClick={() => setPreviewCc(null)}
                 className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg">Fechar</button>

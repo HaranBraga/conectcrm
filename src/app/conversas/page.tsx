@@ -13,6 +13,7 @@ import { CampaignBadges } from "@/components/ui/CampaignBadges";
 import { DemandaInline } from "@/components/ui/DemandaInline";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { displayPhone } from "@/lib/phone-display";
 import toast from "react-hot-toast";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -390,7 +391,7 @@ export default function ConversasPage() {
 
   const filtered = conversations.filter(c => {
     const q = search.toLowerCase();
-    return !q || c.contact?.name?.toLowerCase().includes(q) || c.contact?.phone?.includes(q);
+    return !q || c.contact?.name?.toLowerCase().includes(q) || (displayPhone(c.contact?.phone) ?? "").includes(q);
   });
 
   const isUnknown = selected && (!selected.contact?.name || selected.contact?.name === selected.contact?.phone);
@@ -443,7 +444,7 @@ export default function ConversasPage() {
                 <Avatar contact={conv.contact} size={42} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
-                    <p className="text-sm font-medium text-gray-900 truncate">{conv.contact?.name || conv.contact?.phone}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{conv.contact?.name || displayPhone(conv.contact?.phone) || "(sem nome)"}</p>
                     <span className="text-[11px] text-gray-400 shrink-0">{conv.lastMessageAt ? msgTime(conv.lastMessageAt) : ""}</span>
                   </div>
                   <p className="text-xs text-gray-500 truncate mt-0.5">{conv.lastMessageText || "—"}</p>
@@ -479,10 +480,10 @@ export default function ConversasPage() {
             <Avatar contact={selected.contact} size={38} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <p className="font-semibold text-gray-900 text-sm truncate">{selected.contact?.name || selected.contact?.phone}</p>
+                <p className="font-semibold text-gray-900 text-sm truncate">{selected.contact?.name || displayPhone(selected.contact?.phone) || "(sem nome)"}</p>
                 {selected.contact?.role && <RoleBadge role={selected.contact.role} />}
               </div>
-              <p className="text-xs text-gray-400">{selected.contact?.phone}</p>
+              <p className="text-xs text-gray-400">{displayPhone(selected.contact?.phone) ?? ""}</p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
               {isUnknown && (
@@ -500,7 +501,7 @@ export default function ConversasPage() {
               />
               <DemandaInline
                 contactId={selected.contactId}
-                contactName={selected.contact?.name ?? selected.contact?.phone ?? "contato"}
+                contactName={selected.contact?.name ?? displayPhone(selected.contact?.phone) ?? "contato"}
                 conversaId={selected.id}
               />
               {showArchived ? (

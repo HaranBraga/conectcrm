@@ -6,6 +6,7 @@ import { RoleBadge } from "@/components/ui/RoleBadge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
+import { displayPhone } from "@/lib/phone-display";
 
 function GroupForm({ initial, onSave, onClose }: any) {
   const [form, setForm] = useState({ name: "", description: "", date: "", ...initial });
@@ -44,7 +45,7 @@ function AddMembersModal({ group, onClose }: any) {
 
   useEffect(() => { fetch("/api/contacts").then((r) => r.json()).then(setContacts); }, []);
 
-  const filtered = contacts.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search));
+  const filtered = contacts.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()) || (displayPhone(c.phone) ?? "").includes(search));
 
   const toggle = (id: string) => setSelected((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
@@ -71,7 +72,7 @@ function AddMembersModal({ group, onClose }: any) {
             <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} className="accent-brand-600" />
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-900">{c.name}</p>
-              <p className="text-xs text-gray-500">{c.phone}</p>
+              <p className="text-xs text-gray-500">{displayPhone(c.phone) ?? ""}</p>
             </div>
             <RoleBadge role={c.role} />
           </label>
